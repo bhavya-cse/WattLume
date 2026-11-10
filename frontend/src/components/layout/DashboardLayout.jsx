@@ -14,17 +14,20 @@ export default function DashboardLayout({ onBackToLanding, initialView = 'overvi
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  // Exact 7 view routing per specification
   const renderActiveView = () => {
     switch (activeView) {
       case 'overview':
         return <OverviewView onNavigateView={setActiveView} />;
       case 'analytics':
+      case 'usage': // backward compatible alias
         return <AnalyticsView onNavigateView={setActiveView} />;
       case 'appliances':
         return <AppliancesView onNavigateView={setActiveView} />;
       case 'insights':
         return <InsightsView onNavigateView={setActiveView} />;
-      case 'billing':
+      case 'bills':
+      case 'billing': // backward compatible alias
         return <BillingView onNavigateView={setActiveView} />;
       case 'reports':
         return <ReportsView onNavigateView={setActiveView} />;
@@ -36,8 +39,8 @@ export default function DashboardLayout({ onBackToLanding, initialView = 'overvi
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-brand-navy text-slate-900 dark:text-slate-100 flex flex-col font-sans">
-      
+    <div className="min-h-screen bg-brand-offwhite dark:bg-[#101B2D] text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-brand-cyan/20 selection:text-brand-cyan">
+
       {/* Desktop Sidebar */}
       <Sidebar
         activeView={activeView}
@@ -51,13 +54,13 @@ export default function DashboardLayout({ onBackToLanding, initialView = 'overvi
       {mobileSidebarOpen && (
         <div
           onClick={() => setMobileSidebarOpen(false)}
-          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden animate-in fade-in"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden animate-in fade-in"
         />
       )}
 
       {/* Mobile Drawer Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white dark:bg-brand-navyLight border-r border-slate-200 dark:border-white/10 transition-transform duration-300 lg:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white dark:bg-[#101B2D] border-r border-slate-200/80 dark:border-white/10 transition-transform duration-300 lg:hidden ${
           mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -76,7 +79,7 @@ export default function DashboardLayout({ onBackToLanding, initialView = 'overvi
       {/* Main Content Area */}
       <div
         className={`flex-1 flex flex-col transition-all duration-300 ${
-          sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-60'
         }`}
       >
         <Topbar

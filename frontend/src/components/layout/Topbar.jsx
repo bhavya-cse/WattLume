@@ -1,51 +1,62 @@
 import React, { useState } from 'react';
-import { 
-  Bell, 
-  Sun, 
-  Moon, 
-  Play, 
-  Pause, 
-  Gauge, 
-  Menu, 
-  Check, 
-  AlertTriangle, 
+import {
+  Bell,
+  Sun,
+  Moon,
+  Play,
+  Pause,
+  Menu,
+  Check,
+  AlertTriangle,
   ArrowRight,
-  User,
-  ShieldCheck
+  Sliders,
+  Settings,
+  X,
+  RotateCcw,
+  Zap,
+  Info,
+  Home
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useSimulation } from '../../context/SimulationContext';
 import LivePulse from '../brand/LivePulse';
-import { acknowledgeAnomaly } from '../../services/api';
+import { acknowledgeAnomaly, resetSimulation, updateSimulationControl } from '../../services/api';
 
-export default function Topbar({ 
-  activeView, 
+export default function Topbar({
+  activeView,
   onToggleMobileSidebar,
-  onNavigateView 
+  onNavigateView
 }) {
   const { isDark, toggleTheme } = useTheme();
-  const { 
-    speedMultiplier, 
-    changeSpeed, 
-    isPaused, 
-    togglePause, 
+  const {
+    speedMultiplier,
+    changeSpeed,
+    isPaused,
+    togglePause,
     recentAnomalies,
     unreadAlertsCount,
     setUnreadAlertsCount,
-    addToast
+    addToast,
+    refreshLive
   } = useSimulation();
 
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [speedDropdownOpen, setSpeedDropdownOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sensitivity, setSensitivity] = useState(1.3);
+  const [resetting, setResetting] = useState(false);
 
   const viewTitles = {
-    overview: 'Overview Dashboard',
-    analytics: 'Energy Analytics',
-    appliances: 'Appliance Management',
-    insights: 'Smart Insights & Anomalies',
-    billing: 'Electricity Bill Management',
-    reports: 'Reports & Export',
-    settings: 'System Settings',
+    overview: 'Overview',
+    analytics: 'Analytics',
+    appliances: 'Appliances',
+    insights: 'Smart Insights',
+    bills: 'Bills & Tariffs',
+    reports: 'Compliance Reports',
+    settings: 'Settings & Controls',
+    // aliases
+    usage: 'Analytics',
+    billing: 'Bills & Tariffs',
   };
 
   const handleAcknowledge = async (id, e) => {
@@ -59,165 +70,187 @@ export default function Topbar({
     }
   };
 
+  const handleSensitivityChange = async (val) => {
+    setSensitivity(val);
+    try {
+      await updateSimulationControl({ anomaly_sensitivity: val });
+      addToast(`Anomaly detection threshold adjusted to +${Math.round((val - 1.0) * 100)}%`, 'info');
+    } catch {
+      // fallback
+    }
+  };
+
+  const handleResetData = async () => {
+    if (!window.confirm("Are you sure you want to re-seed the simulation database? This will purge all records and regenerate 60 days of realistic simulated energy data in SQLite.")) {
+      return;
+    }
+    setResetting(true);
+    try {
+      await resetSimulation();
+      addToast("Database re-seeded with fresh 60 days of simulated energy telemetry", "success");
+      refreshLive();
+      setSettingsOpen(false);
+    } catch (err) {
+      addToast("Failed to reset database", "error");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
-    <header className="h-16 sticky top-0 z-20 bg-white/80 dark:bg-brand-navy/85 backdrop-blur-md border-b border-slate-200 dark:border-white/10 px-4 sm:px-6 flex items-center justify-between">
-      
-      {/* Left: Mobile hamburger & View title */}
+    <header className="h-16 sticky top-0 z-20 bg-white/60 dark:bg-[#101B2D]/75 backdrop-blur-xl border-b border-slate-200/70 dark:border-white/10 px-4 sm:px-6 flex items-center justify-between shadow-[0_1px_10px_rgba(0,0,0,0.02)]">
+
+      {/* Left: Mobile Menu & View title */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleMobileSidebar}
-          aria-label="Open mobile menu"
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5"
+          aria-label="Open mobile navigation menu"
+          className="lg:hidden p-2 rounded-xl text-slate-500 hover:bg-slate-100/70 dark:hover:bg-white/5 transition-colors"
         >
           <Menu className="w-5 h-5" />
         </button>
 
         <div>
-          <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <span>{viewTitles[activeView] || 'Dashboard'}</span>
-          </h1>
-          <p className="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400">
-            WattLume Digital Intelligence Platform • Simulated Smart Hub
-          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-mono hidden sm:inline">WattLume /</span>
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white font-heading">
+              {viewTitles[activeView] || 'Overview'}
+            </h1>
+          </div>
         </div>
       </div>
 
       {/* Right: Controls & Utilities */}
-      <div className="flex items-center gap-2.5 sm:gap-3.5">
-        
-        {/* Live Status Pulse */}
+      <div className="flex items-center gap-2 sm:gap-3">
+
+        {/* Live Simulation Badge */}
         <div className="hidden sm:block">
-          <LivePulse isLive={!isPaused} label={isPaused ? "PAUSED" : "LIVE SIM"} />
+          <LivePulse isLive={!isPaused} label={isPaused ? "PAUSED" : "SIMULATED TELEMETRY"} />
         </div>
 
-        {/* Simulation Speed & Pause Controls */}
+        {/* Simulation Speed Controls */}
         <div className="relative">
-          <div className="flex items-center rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-brand-navyLight p-1">
+          <div className="flex items-center rounded-full glass-pill p-0.5">
             <button
               onClick={togglePause}
               title={isPaused ? "Resume simulation" : "Pause simulation"}
-              className={`p-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors ${
-                isPaused 
-                  ? 'bg-amber-500/20 text-amber-500' 
-                  : 'text-slate-600 dark:text-slate-300 hover:text-white'
+              className={`p-1.5 rounded-full text-xs font-semibold flex items-center transition-colors ${
+                isPaused
+                  ? 'bg-amber-500/10 text-amber-500'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+              {isPaused ? <Play className="w-3.5 h-3.5 fill-current" /> : <Pause className="w-3.5 h-3.5 fill-current" />}
             </button>
 
             <button
               onClick={() => setSpeedDropdownOpen(!speedDropdownOpen)}
-              className="px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 flex items-center gap-1"
+              className="px-2.5 py-1 rounded-full text-xs font-mono font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/10 flex items-center gap-1"
+              title="Simulation speed multiplier"
             >
-              <Gauge className="w-3.5 h-3.5 text-brand-cyan" />
               <span>{speedMultiplier}x</span>
             </button>
           </div>
 
-          {/* Speed Selector Menu */}
+          {/* Speed Selector Dropdown */}
           {speedDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-32 rounded-xl bg-white dark:bg-brand-navyLight border border-slate-200 dark:border-white/10 shadow-xl py-1 z-50 animate-in fade-in zoom-in-95">
+            <div className="absolute right-0 mt-2 w-32 rounded-2xl glass-panel-elevated py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 shadow-xl border border-white/60 dark:border-white/10">
+              <div className="px-3 py-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider border-b border-slate-100 dark:border-white/5">
+                Sim Speed
+              </div>
               {[1, 2, 5, 10].map(s => (
                 <button
                   key={s}
                   onClick={() => {
                     changeSpeed(s);
                     setSpeedDropdownOpen(false);
+                    addToast(`Simulation accelerated to ${s}x real-time`, 'info');
                   }}
-                  className={`w-full px-3 py-1.5 text-xs text-left font-medium flex items-center justify-between hover:bg-slate-100 dark:hover:bg-white/5 ${
-                    speedMultiplier === s ? 'text-brand-cyan font-bold' : 'text-slate-700 dark:text-slate-300'
+                  className={`w-full px-3 py-1.5 text-xs text-left font-mono flex items-center justify-between ${
+                    speedMultiplier === s
+                      ? 'text-brand-blue dark:text-brand-cyan font-bold bg-slate-900/5 dark:bg-white/5'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/5'
                   }`}
                 >
-                  <span>{s}x Speed</span>
-                  {speedMultiplier === s && <Check className="w-3.5 h-3.5 text-brand-cyan" />}
+                  <span>{s}x realtime</span>
+                  {speedMultiplier === s && <Check className="w-3 h-3" />}
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Notification Bell Dropdown */}
+        {/* Notifications / Anomaly Bell */}
         <div className="relative">
           <button
             onClick={() => setNotificationOpen(!notificationOpen)}
-            className="p-2 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-brand-navyLight relative transition-colors"
             aria-label="View notifications"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/5 border border-slate-200/80 dark:border-white/10 transition-colors relative"
           >
             <Bell className="w-4 h-4" />
             {unreadAlertsCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand-coral text-white text-[10px] font-black flex items-center justify-center animate-pulse">
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-brand-coral text-white text-[9px] font-mono font-bold flex items-center justify-center animate-pulse">
                 {unreadAlertsCount}
               </span>
             )}
           </button>
 
+          {/* Notification Popover */}
           {notificationOpen && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white dark:bg-brand-navyLight border border-slate-200 dark:border-white/10 shadow-2xl p-4 z-50 animate-in fade-in zoom-in-95">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-200/80 dark:border-white/10">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-brand-coral" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    Smart Anomaly Alerts
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-400">
-                  {recentAnomalies.length} recorded
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl glass-panel-elevated p-3 z-50 shadow-2xl border border-white/60 dark:border-white/10 animate-in fade-in zoom-in-95 duration-100 space-y-2">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-white/5">
+                <span className="text-xs font-bold text-slate-900 dark:text-white font-heading">
+                  Active Energy Alerts
                 </span>
-              </div>
-
-              <div className="py-2 divide-y divide-slate-100 dark:divide-white/5 max-h-72 overflow-y-auto">
-                {recentAnomalies.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">
-                    No active anomalies detected. Consumption within normal thresholds.
-                  </p>
-                ) : (
-                  recentAnomalies.map((item) => (
-                    <div
-                      key={item.id}
-                      onClick={() => {
-                        setNotificationOpen(false);
-                        onNavigateView('insights');
-                      }}
-                      className="py-2.5 px-2 hover:bg-slate-50 dark:hover:bg-white/[0.03] rounded-lg transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="font-bold text-slate-800 dark:text-slate-200 group-hover:text-brand-cyan transition-colors truncate max-w-[180px]">
-                          {item.title}
-                        </span>
-                        <span className="text-[10px] text-brand-coral font-bold tabular-nums">
-                          +{item.percentage_deviation}%
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-tight">
-                        {item.message}
-                      </p>
-                      <div className="flex items-center justify-between mt-1.5 text-[10px] text-slate-400">
-                        <span>{item.timestamp}</span>
-                        {!item.acknowledged && (
-                          <button
-                            onClick={(e) => handleAcknowledge(item.id, e)}
-                            className="text-brand-cyan hover:underline font-semibold"
-                          >
-                            Mark Read
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="pt-2 border-t border-slate-200/80 dark:border-white/10 text-center">
                 <button
                   onClick={() => {
                     setNotificationOpen(false);
                     onNavigateView('insights');
                   }}
-                  className="text-xs font-bold text-brand-cyan hover:underline inline-flex items-center gap-1"
+                  className="text-[11px] text-brand-blue dark:text-brand-cyan hover:underline font-semibold"
                 >
-                  <span>View All Alerts &amp; Baselines</span>
-                  <ArrowRight className="w-3 h-3" />
+                  View all in Insights →
                 </button>
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                {recentAnomalies.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-slate-400">
+                    No active anomalies detected. All circuits operating within baseline.
+                  </div>
+                ) : (
+                  recentAnomalies.slice(0, 4).map(item => (
+                    <div
+                      key={item.id}
+                      className="p-2.5 rounded-xl bg-slate-50/70 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/5 space-y-1 text-xs"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[200px]">
+                          {item.title}
+                        </span>
+                        <span className="font-mono text-[10px] text-brand-coral font-bold">
+                          +{item.percentage_deviation}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
+                        {item.message}
+                      </p>
+                      <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
+                        <span className="font-mono">{item.timestamp}</span>
+                        {!item.acknowledged ? (
+                          <button
+                            onClick={(e) => handleAcknowledge(item.id, e)}
+                            className="text-brand-cyan hover:underline font-semibold"
+                          >
+                            Acknowledge
+                          </button>
+                        ) : (
+                          <span className="text-slate-400 font-mono">Acknowledged</span>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -226,29 +259,13 @@ export default function Topbar({
         {/* Theme Toggle Button */}
         <button
           onClick={toggleTheme}
-          aria-label="Toggle theme"
-          className="p-2 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-brand-navyLight transition-colors"
+          aria-label="Toggle color theme"
+          className="w-9 h-9 rounded-full flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-900/5 dark:hover:bg-white/5 border border-slate-200/80 dark:border-white/10 transition-colors"
         >
-          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-brand-blue" />}
+          {isDark ? <Sun className="w-4 h-4 text-amber-300" /> : <Moon className="w-4 h-4 text-slate-700" />}
         </button>
 
-        {/* Profile Badge */}
-        <div className="hidden md:flex items-center gap-2.5 pl-2 border-l border-slate-200 dark:border-white/10">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-brand-blue to-brand-cyan flex items-center justify-center text-white font-bold text-xs shadow-sm">
-            WL
-          </div>
-          <div className="text-left">
-            <p className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
-              Aravind S.
-            </p>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-              Smart Home 3-BHK
-            </p>
-          </div>
-        </div>
-
       </div>
-
     </header>
   );
 }
