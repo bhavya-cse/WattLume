@@ -1,26 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
   <defs>
-    <linearGradient id="wl-grad-primary" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#42D9E8" />
-      <stop offset="50%" stop-color="#24C78B" />
-      <stop offset="100%" stop-color="#4169E1" />
-    </linearGradient>
-    <linearGradient id="wl-grad-glow" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#24C78B" stop-opacity="0.8" />
-      <stop offset="100%" stop-color="#42D9E8" stop-opacity="0.2" />
+    <linearGradient id="wlFavGradient" x1="6" y1="10" x2="26" y2="22" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stopColor="#4169E1" />
+      <stop offset="50%" stopColor="#42D9E8" />
+      <stop offset="100%" stopColor="#24C78B" />
     </linearGradient>
   </defs>
-  <!-- Background Badge -->
-  <rect width="48" height="48" rx="12" fill="#101B2D" />
-  <rect x="1" y="1" width="46" height="46" rx="11" stroke="rgba(66, 217, 232, 0.25)" stroke-width="1.5" />
-  
-  <!-- Outer Energy Geometric Prisms -->
-  <path d="M24 8 L36 15 V33 L24 40 L12 33 V15 Z" stroke="url(#wl-grad-primary)" stroke-width="2.5" stroke-linejoin="round" fill="none" opacity="0.4" />
-  
-  <!-- Dynamic Energy Flow Nodes -->
-  <path d="M24 13 L32 18 V28 L24 33 L16 28 V18 Z" fill="url(#wl-grad-glow)" stroke="url(#wl-grad-primary)" stroke-width="2" stroke-linejoin="round" />
-  
-  <!-- Central Lume Pulse Core (Intelligent Energy Nexus) -->
-  <circle cx="24" cy="23" r="3.5" fill="#42D9E8" />
-  <path d="M24 17 V29 M19 23 H29" stroke="#B8F3D5" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- Dark Background Squircle -->
+  <rect width="32" height="32" rx="8" fill="#101B2D" />
+
+  <!-- Distinctive Geometric 'W' Energy Conduit -->
+  <path
+    d="M 6.5 10.5 L 11.5 22 L 16 13.5 L 20.5 22 L 25.5 10.5"
+    stroke="url(#wlFavGradient)"
+    stroke-width="2.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Central Lume Optical Node -->
+  <circle cx="16" cy="13.5" r="2.2" fill="#42D9E8" />
+  <circle cx="16" cy="13.5" r="1" fill="#FFFFFF" />
 </svg>

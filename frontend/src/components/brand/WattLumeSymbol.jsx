@@ -1,75 +1,90 @@
 import React from 'react';
 
-export default function WattLumeSymbol({ size = 36, animated = true, className = "" }) {
+/**
+ * WattLume Brand Symbol
+ * Distinctive standalone geometric 'W' mark fusing energy waveform dynamics
+ * with optical lume illumination. Engineered for pixel-crisp rendering from 16px to 128px.
+ */
+export default function WattLumeSymbol({ size = 26, className = "" }) {
   return (
-    <div 
-      className={`relative inline-flex items-center justify-center shrink-0 ${className}`}
+    <div
+      className={`inline-flex items-center justify-center shrink-0 ${className}`}
       style={{ width: size, height: size }}
     >
-      {animated && (
-        <div 
-          className="absolute inset-0 rounded-xl bg-gradient-to-tr from-brand-cyan/25 to-brand-emerald/30 blur-[6px] animate-pulse"
-        />
-      )}
       <svg
-        viewBox="0 0 48 48"
+        viewBox="0 0 32 32"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full relative z-10 drop-shadow-sm"
+        className="w-full h-full"
       >
         <defs>
-          <linearGradient id="sym-grad-primary" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#42D9E8" />
-            <stop offset="45%" stopColor="#24C78B" />
-            <stop offset="100%" stopColor="#4169E1" />
+          <linearGradient id="wlSymbolGradient" x1="5" y1="9" x2="27" y2="23" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#4169E1" />
+            <stop offset="50%" stopColor="#42D9E8" />
+            <stop offset="100%" stopColor="#24C78B" />
           </linearGradient>
-          <linearGradient id="sym-grad-glow" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#24C78B" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#42D9E8" stopOpacity="0.25" />
+          <linearGradient id="wlGlow" x1="16" y1="8" x2="16" y2="24" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#42D9E8" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#4169E1" stopOpacity="0.0" />
           </linearGradient>
-          <radialGradient id="sym-core-lume" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#FFFFFF" />
-            <stop offset="40%" stopColor="#42D9E8" />
-            <stop offset="100%" stopColor="#24C78B" stopOpacity="0" />
-          </radialGradient>
         </defs>
 
-        {/* Outer Geometric Hex Shield with Micro-Gaps */}
-        <path
-          d="M24 6 L38 14.5 V31.5 L24 40 L10 31.5 V14.5 Z"
-          stroke="url(#sym-grad-primary)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={animated ? "opacity-75" : "opacity-90"}
+        {/* Ambient Glass Squircle Backplate */}
+        <rect
+          x="1"
+          y="1"
+          width="30"
+          height="30"
+          rx="7.5"
+          className="fill-slate-900/5 dark:fill-white/5 stroke-slate-900/10 dark:stroke-white/10"
+          strokeWidth="1"
         />
 
-        {/* Internal Luminous Energy Matrix */}
+        {/* Precision Geometric 'W' Energy Waveform */}
+        {/* Left Phase */}
         <path
-          d="M24 13 L33 18.5 V29.5 L24 35 L15 29.5 V18.5 Z"
-          fill="url(#sym-grad-glow)"
-          stroke="url(#sym-grad-primary)"
-          strokeWidth="1.8"
+          d="M 6.5 10.5 L 11.5 22 L 16 13.5"
+          stroke="url(#wlSymbolGradient)"
+          strokeWidth="2.4"
+          strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        {/* Ray Lines - Energy Distribution */}
-        <line x1="24" y1="6" x2="24" y2="13" stroke="#42D9E8" strokeWidth="2" strokeLinecap="round" />
-        <line x1="38" y1="14.5" x2="33" y2="18.5" stroke="#24C78B" strokeWidth="2" strokeLinecap="round" />
-        <line x1="10" y1="31.5" x2="15" y2="29.5" stroke="#42D9E8" strokeWidth="2" strokeLinecap="round" />
-        <line x1="24" y1="40" x2="24" y2="35" stroke="#4169E1" strokeWidth="2" strokeLinecap="round" />
-
-        {/* Dynamic Center Illuminator (Lume Core) */}
-        <circle cx="24" cy="24" r="5" fill="url(#sym-core-lume)" />
-        <circle cx="24" cy="24" r="2.2" fill="#FFFFFF" />
-
-        {/* Micro-spark vectors */}
+        {/* Right Phase */}
         <path
-          d="M24 18 V30 M18 24 H30"
-          stroke="#B8F3D5"
-          strokeWidth="1.2"
+          d="M 16 13.5 L 20.5 22 L 25.5 10.5"
+          stroke="url(#wlSymbolGradient)"
+          strokeWidth="2.4"
           strokeLinecap="round"
-          opacity="0.85"
+          strokeLinejoin="round"
+        />
+
+        {/* Central Optical Lume Core (Energy made visible) */}
+        <circle
+          cx="16"
+          cy="13.5"
+          r="2.2"
+          className="fill-brand-cyan"
+        />
+        <circle
+          cx="16"
+          cy="13.5"
+          r="1"
+          className="fill-white"
+        />
+
+        {/* Sub-nodal energy pulse accent */}
+        <circle
+          cx="11.5"
+          cy="22"
+          r="1.2"
+          className="fill-brand-blue"
+        />
+        <circle
+          cx="20.5"
+          cy="22"
+          r="1.2"
+          className="fill-brand-emerald"
         />
       </svg>
     </div>
