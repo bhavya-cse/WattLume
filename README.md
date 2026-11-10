@@ -20,24 +20,32 @@
 - **Lume**: Illumination, lucidity, transparency, and actionable visibility.
 - **WattLume**: Bringing hidden electrical waste to light through elegant digital intelligence.
 
-### Visual Design System
-- **Deep Midnight Navy (`#101B2D`)**: Foundational SaaS canvas.
-- **Royal Blue (`#4169E1`)**: Energy analytics, longitudinal benchmarks.
-- **Electric Cyan (`#42D9E8`)**: Real-time electrical telemetry stream, active pulses.
-- **Fresh Emerald (`#24C78B`)**: Efficiency gains, financial conservation, optimal status.
-- **Soft Mint (`#B8F3D5`)**: Micro-spark indicators and highlights.
-- **Warm Off-white (`#F7F9FC`)**: High-contrast typography and light theme canvas.
-- **Lavender Accent (`#A78BFA`)**: Intelligent machine learning insights, multi-factor scoring.
+### Visual Design System & Creative Direction
+- **Design Philosophy**: Minimal, restrained, human-crafted aesthetic inspired by Pratyora. Generous purposeful whitespace, crisp hairline borders, and purposeful contrast.
+- **Deep Indigo & Midnight Navy (`#17143F` / `#101B2D`)**: Architectural canvas grounding.
+- **Warm Off-white (`#F7F9FC`)**: Refined light-theme background canvas.
+- **Electric Cyan (`#42D9E8`)**: Real-time electrical telemetry stream, active node pulses.
+- **Fresh Emerald (`#24C78B`)**: Verified financial savings, efficiency gains, breaker active status.
+- **Royal Blue (`#4169E1`)**: Longitudinal analytics and primary interactive controls.
 - **Coral Warning (`#FF806B`)**: Z-score anomaly alerts and threshold breach flags.
+- **Lavender (`#A78BFA`)**: Multi-factor scoring indexes.
+- **Typography**: Bricolage Grotesque for headings (`font-heading`), Figtree for body (`font-sans`), and JetBrains Mono for tabular metrics (`tabular-nums font-mono`).
+- **Streamlined 5-Section Dashboard Architecture**:
+  1. **Overview**: Live-updating simulated telemetry, 4 core KPI cards, 24-hour diurnal load curve, top appliance breakdown, and live alert ticker.
+  2. **Energy Usage & Billing**: Unified longitudinal analytics (Today, 7D, 30D, 12M), multi-slab tariff invoice projection, and Downloadable energy reports with CSV download and print capabilities.
+  3. **Appliances**: Clean fleet inventory with Simulated power consumption , daily kWh consumption, monthly cost estimates, and Simulated appliance control switches.
+  4. **Smart Insights**: Statistical anomaly triage (What happened / Why it matters / What you can do), efficiency scoring benchmark, monthly bill forecasting, and practical rupee-saving conservation advisories.
+  5. **Profile & Simulation Settings**: Accessible via the topbar control for household profile specs, simulation speed multipliers (1x–10x), pause/resume, anomaly sensitivity threshold slider, and SQLite database reset.
+- **Anti-AI Design Principles**: No generic rainbow gradient text, no floating blur blobs, no identical 3-column card grids, no oversized cartoon icons. Built with intentional restraint and human design maturity.
 
 ### Custom Geometric Logo Symbol
-The WattLume emblem combines an outer faceted geometric shield with an internal interlocking luminous nexus and four directional energy vectors, terminating in a central illumination core (*Lume*).
+The WattLume emblem is a precision industrial geometric badge featuring a faceted diamond matrix, dynamic cyan energy core vectors, and a central *Lume Nexus* point with micro bus terminal alignments.
 
 ---
 
 ## 🌟 Key Features
 
-1. **Real-Time Telemetry Stream**: Sub-second synchronized simulation of instantaneous active power ($W$ / $kW$), RMS voltage ($230V \pm 3V$), load current ($A$), power factor ($0.92 - 0.98$), frequency ($50Hz$), and cumulative kilowatt-hours ($kWh$).
+1. **Live-updating simulated telemetry Stream**: Sub-second synchronized simulation of instantaneous active power ($W$ / $kW$), RMS voltage ($230V \pm 3V$), load current ($A$), power factor ($0.92 - 0.98$), frequency ($50Hz$), and cumulative kilowatt-hours ($kWh$).
 2. **Interactive Appliance Fleet Management**: 9 canonical residential appliances (Inverter AC, Double-Door Refrigerator, BLDC Fan, 4K TV, Front-Load Washing Machine, Smart LEDs, Home Office Workstation, 25L Storage Geyser, and Microwave Oven). Real-time ON/OFF toggling immediately impacts live system power draw. Full CRUD support to add, edit, or remove appliances.
 3. **Statistical Anomaly Detection (Z-Score)**: Grouping historical hourly readings into baseline distributions $(\mu_h, \sigma_h)$. Flagging surges exceeding $+30\%$ or $2.0\sigma$ with culprit appliance attribution and root-cause analysis.
 4. **Predictive Electricity Bill Forecasting (₹ INR)**: Dynamic month-to-date accrual and end-of-month cost projection based on daily burn rate under configurable **Slab-Based (Tiered)** or **Flat-Rate** tariff schedules, monthly fixed charges, and regulatory duty/taxes.
