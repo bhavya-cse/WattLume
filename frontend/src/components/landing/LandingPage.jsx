@@ -1,14 +1,15 @@
 import React from 'react';
 import LandingNavbar from './LandingNavbar';
 import LandingHero from './LandingHero';
-import LandingFeatures from './LandingFeatures';
-import LandingHowItWorks from './LandingHowItWorks';
-import LandingStats from './LandingStats';
-import LandingFinalCTA from './LandingFinalCTA';
+import LandingThreePillars from './LandingThreePillars';
 import LandingFooter from './LandingFooter';
 
 export default function LandingPage({ onEnterDashboard }) {
   const scrollToSection = (id) => {
+    if (id === 'hero') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
@@ -16,35 +17,29 @@ export default function LandingPage({ onEnterDashboard }) {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-brand-navy text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-brand-cyan/20 selection:text-brand-cyan">
-      
-      {/* Sticky Top Navigation */}
+    <div className="min-h-screen bg-brand-offwhite dark:bg-brand-navy text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-brand-cyan/20 selection:text-brand-cyan">
+
+      {/* Liquid Glass Navigation */}
       <LandingNavbar
         onEnterDashboard={onEnterDashboard}
         onNavigateSection={scrollToSection}
       />
 
-      {/* Main Sections */}
+      {/* Main Content */}
       <main className="flex-1">
+        {/* Editorial Hero with 3D Liquid Glass Product Preview */}
         <LandingHero
           onEnterDashboard={onEnterDashboard}
-          onDiscoverHowItWorks={() => scrollToSection('how-it-works')}
+          onSeeHowItWorks={() => scrollToSection('overview')}
         />
 
-        <LandingFeatures
-          onSelectFeature={(featureView) => onEnterDashboard(featureView)}
-        />
-
-        <LandingHowItWorks />
-
-        <LandingStats />
-
-        <LandingFinalCTA
+        {/* 3 Core Architecture Modules */}
+        <LandingThreePillars
           onEnterDashboard={onEnterDashboard}
         />
       </main>
 
-      {/* Footer */}
+      {/* Restrained Minimal Footer */}
       <LandingFooter
         onNavigateSection={scrollToSection}
         onEnterDashboard={onEnterDashboard}
