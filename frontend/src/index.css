@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-primary: #F7F9FC;
+    --bg-card: #FFFFFF;
+    --text-primary: #101B2D;
+    --text-secondary: #4A5568;
+    --border-color: #E2E8F0;
+  }
+
+  .dark {
+    --bg-primary: #101B2D;
+    --bg-card: #16243C;
+    --text-primary: #F7F9FC;
+    --text-secondary: #94A3B8;
+    --border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    overflow-x: hidden;
+  }
+}
+
+/* Custom tabular nums for electrical metrics */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ambient glow & backdrop effects */
+.energy-glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(66, 217, 232, 0.35);
+}
+
+.energy-glow-emerald {
+  box-shadow: 0 0 25px -5px rgba(36, 199, 139, 0.35);
+}
+
+.energy-glow-blue {
+  box-shadow: 0 0 25px -5px rgba(65, 105, 225, 0.35);
+}
+
+/* Grid background for high-tech SaaS look */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(66, 217, 232, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(66, 217, 232, 0.05) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, rgba(66, 217, 232, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(66, 217, 232, 0.04) 1px, transparent 1px);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* Respect user's reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
