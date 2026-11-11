@@ -17,8 +17,7 @@ export default function LandingPage({ onEnterDashboard }) {
   };
 
   return (
-    <div className="min-h-screen bg-brand-offwhite dark:bg-brand-navy text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-brand-cyan/20 selection:text-brand-cyan">
-
+<div className="min-h-screen bg-brand-offwhite dark:bg-[#17191D] text-slate-900 dark:text-[#F4F5F6] flex flex-col font-sans selection:bg-brand-cyan/20 selection:text-brand-cyan">
       {/* Liquid Glass Navigation */}
       <LandingNavbar
         onEnterDashboard={onEnterDashboard}
