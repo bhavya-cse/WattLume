@@ -15,17 +15,127 @@ import {
   Flame,
   Laptop,
   Lightbulb,
-  Radio,
-  Sliders,
-  Check
+  Activity,
+  Receipt,
+  AlertTriangle,
 } from 'lucide-react';
-import { fetchAppliances, toggleAppliance, createAppliance, updateAppliance, deleteAppliance } from '../../services/api';
+import {
+  fetchAppliances,
+  toggleAppliance,
+  createAppliance,
+  updateAppliance,
+  deleteAppliance,
+} from '../../services/api';
 import { useSimulation } from '../../context/SimulationContext';
 
+/* ---------- helpers ---------- */
+
+const CURRENCY = '₹';
+const BASE_CATEGORIES = [
+  'Cooling',
+  'Kitchen',
+  'Heating',
+  'Entertainment',
+  'Computing',
+  'Lighting',
+  'Utility',
+  'General',
+];
+
+const focusRing =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/60';
+
+const inputCls =
+  'w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#17191D] text-sm text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan focus-visible:ring-2 focus-visible:ring-brand-cyan/30';
+
+const muted = 'text-slate-500 dark:text-[#A1A6AE]';
+
+const toNum = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+const fmtMoney = (n) => `${CURRENCY}${Math.round(n || 0).toLocaleString('en-IN')}`;
+
+/* Fixed colour per appliance (same variables as the Overview breakdown) */
+const applianceColor = (name = '') => {
+  const n = name.toLowerCase();
+  if (n.includes('air cond')) return 'var(--wd-ap-ac)';
+  if (n.includes('refrigerator') || n.includes('fridge')) return 'var(--wd-ap-fridge)';
+  if (n.includes('geyser') || n.includes('water heater')) return 'var(--wd-ap-geyser)';
+  if (n.includes('washing')) return 'var(--wd-ap-washer)';
+  if (n.includes('television') || /\btv\b/.test(n)) return 'var(--wd-ap-tv)';
+  return 'var(--wd-ap-other)';
+};
+
+const getCategoryIcon = (cat = '') => {
+  switch (cat.toLowerCase()) {
+    case 'cooling': return Wind;
+    case 'kitchen': return Coffee;
+    case 'heating': return Flame;
+    case 'entertainment': return Tv;
+    case 'computing': return Laptop;
+    case 'lighting': return Lightbulb;
+    case 'utility': return Power;
+    default: return Zap;
+  }
+};
+
+const tileStyle = (color) => ({
+  '--c': color,
+  background: 'color-mix(in srgb, var(--c) 14%, transparent)',
+  color: 'var(--c)',
+});
+
+/* ---------- small components ---------- */
+
+function BreakerSwitch({ on, label, onClick }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 motion-reduce:transition-none ${focusRing} ${
+        on ? 'bg-brand-emerald' : 'bg-slate-300 dark:bg-white/20'
+      }`}
+    >
+      <span
+        className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 motion-reduce:transition-none ${
+          on ? 'translate-x-[18px]' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  );
+}
+
+function LoadBar({ share, color, width = 64 }) {
+  return (
+    <div className="wd-track" style={{ width }} aria-hidden="true">
+      <div className="wd-fill" style={{ '--c': color, width: `${share}%` }} />
+    </div>
+  );
+}
+
+function Kpi({ index, accent, label, icon: Icon, live = false, children }) {
+  return (
+    <div className={`wd-ov-kpi wd-kpi ${accent}`} style={{ '--i': index }}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="wd-kpi-label">{label}</span>
+        <span className={`wd-ov-icon ${live ? 'wd-ov-icon-live' : ''}`}>
+          <Icon className="w-3.5 h-3.5" />
+        </span>
+      </div>
+      <div className="mt-3 space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+/* ---------- view ---------- */
+
 export default function AppliancesView() {
-  const { addToast, refreshLive } = useSimulation();
+  const { addToast, refreshLive, liveTelemetry, isPaused } = useSimulation();
   const [appliances, setAppliances] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'grid'
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -33,6 +143,7 @@ export default function AppliancesView() {
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppliance, setEditingAppliance] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     category: 'Cooling',
@@ -46,9 +157,11 @@ export default function AppliancesView() {
   const loadData = async () => {
     try {
       const data = await fetchAppliances();
-      setAppliances(data);
+      setAppliances(Array.isArray(data) ? data : []);
+      setLoadError(false);
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -58,10 +171,21 @@ export default function AppliancesView() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (!isModalOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setIsModalOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isModalOpen]);
+
   const handleToggle = async (app) => {
     try {
       const res = await toggleAppliance(app.id);
-      setAppliances(prev => prev.map(a => a.id === app.id ? { ...a, is_active: res.is_active } : a));
+      setAppliances((prev) =>
+        prev.map((a) => (a.id === app.id ? { ...a, is_active: res.is_active } : a))
+      );
       addToast(res.message, res.is_active ? 'success' : 'info');
       refreshLive();
     } catch (err) {
@@ -101,7 +225,7 @@ export default function AppliancesView() {
     if (!window.confirm(`Are you sure you want to remove '${name}' from monitoring?`)) return;
     try {
       await deleteAppliance(id);
-      setAppliances(prev => prev.filter(a => a.id !== id));
+      setAppliances((prev) => prev.filter((a) => a.id !== id));
       addToast(`Removed ${name}`, 'info');
       refreshLive();
     } catch {
@@ -111,8 +235,9 @@ export default function AppliancesView() {
 
   const handleSubmitModal = async (e) => {
     e.preventDefault();
-    if (!formData.name) return;
+    if (!formData.name || saving) return;
 
+    setSaving(true);
     try {
       if (editingAppliance) {
         await updateAppliance(editingAppliance.id, formData);
@@ -126,115 +251,189 @@ export default function AppliancesView() {
       refreshLive();
     } catch {
       addToast('Error saving appliance', 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const categories = ['All', 'Cooling', 'Kitchen', 'Heating', 'Entertainment', 'Computing', 'Lighting'];
+  const clearFilters = () => {
+    setSelectedCategory('All');
+    setSearchTerm('');
+  };
 
-  const filteredAppliances = appliances.filter(app => {
-    const matchesCat = selectedCategory === 'All' || app.category.toLowerCase() === selectedCategory.toLowerCase();
-    const matchesSearch = app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (app.room && app.room.toLowerCase().includes(searchTerm.toLowerCase()));
+  /* ---------- loading and error states ---------- */
+
+  if (loading && appliances.length === 0) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+        <div className="space-y-2">
+          <div className="wd-skeleton h-8 w-48" />
+          <div className="wd-skeleton h-4 w-96 max-w-full" />
+        </div>
+        <div className="wd-skeleton h-32 w-full" style={{ borderRadius: 'var(--wd-radius)' }} />
+        <div className="wd-skeleton h-96 w-full" style={{ borderRadius: 'var(--wd-radius)' }} />
+      </div>
+    );
+  }
+
+  if (loadError && appliances.length === 0) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+        <div className="wd-card flex flex-col items-center text-center gap-3 py-12">
+          <span className="wd-ov-icon" style={{ '--accent': 'var(--wd-bad)' }}>
+            <AlertTriangle className="w-4 h-4" />
+          </span>
+          <h2 className="wd-title font-heading">Couldn't load your appliances</h2>
+          <p className={`text-xs max-w-sm ${muted}`}>
+            The backend didn't respond. Check that it is running, then try again.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setLoadError(false);
+              loadData();
+            }}
+            className={`mt-1 px-4 py-2 rounded-lg text-xs font-semibold bg-brand-royal text-white hover:opacity-90 transition-opacity ${focusRing}`}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- derived data ---------- */
+
+  const live = liveTelemetry || {};
+  const liveBreakdown = live.breakdown || {};
+  const liveTotalW = toNum(live.current_power_watts);
+
+  const drawOf = (app) => (app.is_active ? toNum(liveBreakdown[app.name]) : 0);
+  const shareOf = (w) =>
+    liveTotalW && w != null && w > 0
+      ? Math.min(100, Math.max(2, (w / liveTotalW) * 100))
+      : 0;
+  const dailyOf = (app) => toNum(app.daily_kwh) ?? toNum(app.daily_energy_kwh);
+
+  const categories = [
+    'All',
+    ...Array.from(new Set(appliances.map((a) => a.category).filter(Boolean))).sort(),
+  ];
+
+  const filteredAppliances = appliances.filter((app) => {
+    const matchesCat =
+      selectedCategory === 'All' ||
+      (app.category || '').toLowerCase() === selectedCategory.toLowerCase();
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      app.name.toLowerCase().includes(term) ||
+      (app.room && app.room.toLowerCase().includes(term));
     return matchesCat && matchesSearch;
   });
 
-  const totalRunningWatts = appliances.filter(a => a.is_active).reduce((sum, a) => sum + a.power_watts, 0);
-  const totalMonthlyCost = appliances.reduce((sum, a) => sum + (a.is_active ? a.monthly_cost_inr : 0), 0);
-  const activeCount = appliances.filter(a => a.is_active).length;
+  const totalRunningWatts = appliances
+    .filter((a) => a.is_active)
+    .reduce((sum, a) => sum + (a.power_watts || 0), 0);
+  const totalMonthlyCost = appliances.reduce(
+    (sum, a) => sum + (a.is_active ? a.monthly_cost_inr || 0 : 0),
+    0
+  );
+  const activeCount = appliances.filter((a) => a.is_active).length;
 
-  const getCategoryIcon = (cat) => {
-    switch (cat.toLowerCase()) {
-      case 'cooling': return Wind;
-      case 'kitchen': return Coffee;
-      case 'heating': return Flame;
-      case 'entertainment': return Tv;
-      case 'computing': return Laptop;
-      case 'lighting': return Lightbulb;
-      default: return Zap;
-    }
-  };
+  const modalCategories = Array.from(new Set([...BASE_CATEGORIES, formData.category].filter(Boolean)));
+
+  /* ---------- render ---------- */
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
 
-      {/* View Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-[var(--wd-line)]">
         <div>
-          <span className="text-xs font-mono font-medium text-slate-500 uppercase tracking-wider">
-            Circuit Management
-          </span>
           <h2 className="text-2xl sm:text-3xl font-heading font-extrabold tracking-tight text-slate-900 dark:text-white">
             Appliances
           </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Monitor appliance power draw, calculate device costs, and toggle individual circuits.
+          <p className={`text-sm mt-1 max-w-xl ${muted}`}>
+            Switch circuits on and off, see what each appliance draws right now, and what it costs per month.
           </p>
         </div>
 
         <button
+          type="button"
           onClick={handleOpenAdd}
-          className="self-start sm:self-auto px-5 py-2.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-brand-royal dark:hover:bg-slate-100 text-xs font-semibold flex items-center gap-2 shadow-sm transition-all duration-200 active:scale-95"
+          className={`self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-royal text-white text-xs font-semibold hover:opacity-90 transition-opacity ${focusRing}`}
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Add Appliance</span>
+          <span>Add appliance</span>
         </button>
       </div>
 
-      {/* Summary Strip in iOS Glass Panels */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <div className="text-[11px] font-mono uppercase text-slate-400 tracking-wider">Monitored Fleet</div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-heading font-bold text-slate-900 dark:text-white tabular-nums">
-              {appliances.length}
-            </span>
-            <span className="text-xs text-slate-400">appliances</span>
+      {/* Summary strip */}
+      <div className="wd-ov-kpis wd-enter grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ '--i': 1 }}>
+        <Kpi index={1} accent="wd-accent-money" label="Appliances" icon={LayoutGrid}>
+          <div className="flex items-baseline">
+            <span className="wd-kpi-value font-heading">{appliances.length}</span>
+            <span className="wd-kpi-unit">monitored</span>
           </div>
-        </div>
-
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <div className="text-[11px] font-mono uppercase text-slate-400 tracking-wider">Active Breakers</div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-heading font-bold text-brand-blue dark:text-brand-cyan tabular-nums">
-              {activeCount}
-            </span>
-            <span className="text-xs text-slate-400">of {appliances.length} drawing</span>
+          <div className={`text-[11px] font-mono ${muted}`}>
+            {categories.length - 1} {categories.length - 1 === 1 ? 'category' : 'categories'}
           </div>
-        </div>
+        </Kpi>
 
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <div className="text-[11px] font-mono uppercase text-slate-400 tracking-wider">Live Power Draw</div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-heading font-bold text-slate-900 dark:text-white tabular-nums">
-              {(totalRunningWatts / 1000).toFixed(2)}
-            </span>
-            <span className="text-xs font-mono text-slate-400">kW ({totalRunningWatts} W)</span>
+        <Kpi index={2} accent="wd-accent-good" label="Circuits on" icon={Power}>
+          <div className="flex items-baseline">
+            <span className="wd-kpi-value font-heading">{activeCount}</span>
+            <span className="wd-kpi-unit">of {appliances.length}</span>
           </div>
-        </div>
+          <div className={`text-[11px] font-mono ${muted}`}>
+            {appliances.length - activeCount} switched off
+          </div>
+        </Kpi>
 
-        <div className="p-5 rounded-2xl glass-panel space-y-1">
-          <div className="text-[11px] font-mono uppercase text-slate-400 tracking-wider">Monthly Fleet Cost</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-base font-bold text-slate-400">₹</span>
-            <span className="text-2xl sm:text-3xl font-heading font-bold text-slate-900 dark:text-white tabular-nums">
+        <Kpi index={3} accent="wd-accent-live" label="Live draw" icon={Activity} live={!isPaused}>
+          <div className="flex items-baseline">
+            <span className="wd-kpi-value wd-ov-live-value font-heading">
+              {liveTotalW != null ? (liveTotalW / 1000).toFixed(2) : '—'}
+            </span>
+            <span className="wd-kpi-unit">kW</span>
+          </div>
+          <div className={`text-[11px] font-mono ${muted}`}>
+            Rated load of active circuits: {totalRunningWatts.toLocaleString('en-IN')} W
+          </div>
+        </Kpi>
+
+        <Kpi index={4} accent="wd-accent-money" label="Est. monthly cost" icon={Receipt}>
+          <div className="flex items-baseline">
+            <span className="mr-1 text-lg font-semibold text-slate-400">{CURRENCY}</span>
+            <span className="wd-kpi-value font-heading">
               {Math.round(totalMonthlyCost).toLocaleString('en-IN')}
             </span>
           </div>
-        </div>
+          <div className={`text-[11px] font-mono ${muted}`}>Active circuits only</div>
+        </Kpi>
       </div>
 
-      {/* Control Bar: Categories, Search, View Mode */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          {categories.map(cat => (
+      {/* Controls */}
+      <div
+        className="wd-enter flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3"
+        style={{ '--i': 2 }}
+      >
+        <div
+          className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0"
+          role="group"
+          aria-label="Filter by category"
+        >
+          {categories.map((cat) => (
             <button
               key={cat}
+              type="button"
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${
+              aria-pressed={selectedCategory === cat}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${focusRing} ${
                 selectedCategory === cat
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm font-semibold'
-                  : 'glass-pill text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                  : `${muted} hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5`
               }`}
             >
               {cat}
@@ -242,378 +441,448 @@ export default function AppliancesView() {
           ))}
         </div>
 
-        {/* Search & Mode Toggle */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search appliances or room..."
+              aria-label="Search appliances"
+              placeholder="Search by name or room"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-full glass-pill text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-brand-cyan"
+              className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--wd-line)] bg-transparent text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-brand-cyan focus-visible:ring-2 focus-visible:ring-brand-cyan/30"
             />
           </div>
 
-          <div className="flex items-center p-0.5 rounded-full glass-pill">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`p-1.5 rounded-full transition-all ${
-                viewMode === 'table' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm' : 'text-slate-400'
-              }`}
-              title="Table view"
-            >
-              <LayoutList className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-1.5 rounded-full transition-all ${
-                viewMode === 'grid' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm' : 'text-slate-400'
-              }`}
-              title="Grid view"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
+          <div className="flex items-center p-0.5 rounded-lg border border-[var(--wd-line)]">
+            {[
+              { id: 'table', label: 'Table view', Icon: LayoutList },
+              { id: 'grid', label: 'Grid view', Icon: LayoutGrid },
+            ].map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setViewMode(id)}
+                aria-label={label}
+                aria-pressed={viewMode === id}
+                title={label}
+                className={`p-1.5 rounded-md transition-colors ${focusRing} ${
+                  viewMode === id
+                    ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* View Content: Table or Grid */}
-      {viewMode === 'table' ? (
-        <div className="rounded-2xl glass-panel shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-slate-200/60 dark:border-white/10 text-slate-400 uppercase font-mono text-[10px]">
-                  <th className="py-3.5 px-5">Circuit &amp; Appliance</th>
-                  <th className="py-3.5 px-4">Category</th>
-                  <th className="py-3.5 px-4">Room</th>
-                  <th className="py-3.5 px-4 text-right">Power Draw</th>
-                  <th className="py-3.5 px-4 text-right">Today (kWh)</th>
-                  <th className="py-3.5 px-4 text-right">Monthly Est.</th>
-                  <th className="py-3.5 px-4 text-center">Breaker Switch</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                {filteredAppliances.map((app) => {
-                  const Icon = getCategoryIcon(app.category);
-                  return (
-                    <tr
-                      key={app.id}
-                      className={`hover:bg-slate-900/[0.02] dark:hover:bg-white/[0.02] transition-colors ${
-                        !app.is_active ? 'opacity-60 bg-slate-50/40 dark:bg-white/[0.01]' : ''
-                      }`}
-                    >
-                      <td className="py-3.5 px-5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-                            app.is_active
-                              ? 'bg-brand-royal/10 text-brand-royal dark:text-brand-cyan'
-                              : 'bg-slate-100 dark:bg-white/5 text-slate-400'
-                          }`}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <div className="font-semibold text-slate-900 dark:text-white">
-                              {app.name}
-                            </div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              Rated: {app.power_watts}W
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono glass-pill text-slate-600 dark:text-slate-300">
-                          {app.category}
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-500">
-                        {app.room || 'General'}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono font-medium tabular-nums">
-                        {app.is_active ? (
-                          <span className="text-slate-900 dark:text-white font-bold">
-                            {app.power_watts} W
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">0 W (standby)</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono text-slate-700 dark:text-slate-300 tabular-nums">
-                        {(app.daily_kwh || (app.power_watts * 4.2 / 1000)).toFixed(2)}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono font-medium text-slate-900 dark:text-white tabular-nums">
-                        ₹{Math.round(app.monthly_cost_inr || (app.power_watts * 4.2 * 30 * 7.5 / 1000)).toLocaleString()}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <button
-                          onClick={() => handleToggle(app)}
-                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                            app.is_active ? 'bg-brand-emerald shadow-sm shadow-emerald-500/20' : 'bg-slate-300 dark:bg-white/20'
-                          }`}
-                          title={app.is_active ? "Turn breaker OFF" : "Turn breaker ON"}
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                              app.is_active ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                      </td>
-
-                      <td className="py-3.5 px-5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => handleOpenEdit(app)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-                            title="Edit specs"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(app.id, app.name)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                            title="Remove appliance"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* List */}
+      <div className="wd-enter" style={{ '--i': 3 }}>
+        {appliances.length === 0 ? (
+          <div className="wd-card flex flex-col items-center text-center gap-3 py-14">
+            <span className="wd-ov-icon" style={{ '--accent': 'var(--wd-royal)' }}>
+              <Plus className="w-4 h-4" />
+            </span>
+            <h3 className="wd-title font-heading">No appliances yet</h3>
+            <p className={`text-xs max-w-sm ${muted}`}>
+              Add your first appliance to start tracking its power draw and monthly cost.
+            </p>
+            <button
+              type="button"
+              onClick={handleOpenAdd}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold bg-brand-royal text-white hover:opacity-90 transition-opacity ${focusRing}`}
+            >
+              Add appliance
+            </button>
           </div>
-        </div>
-      ) : (
-        /* Grid View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAppliances.map((app) => {
-            const Icon = getCategoryIcon(app.category);
-            return (
-              <div
-                key={app.id}
-                className={`p-5 rounded-2xl glass-panel glass-card-interactive transition-all ${
-                  !app.is_active ? 'opacity-65' : ''
-                }`}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      app.is_active
-                        ? 'bg-brand-royal/10 text-brand-royal dark:text-brand-cyan'
-                        : 'bg-slate-100 dark:bg-white/5 text-slate-400'
-                    }`}>
-                      <Icon className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-tight">
-                        {app.name}
-                      </h4>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        {app.room || 'General'} • {app.category}
-                      </p>
-                    </div>
-                  </div>
+        ) : filteredAppliances.length === 0 ? (
+          <div className="wd-card flex flex-col items-center text-center gap-3 py-14">
+            <span className="wd-ov-icon" style={{ '--accent': 'var(--wd-warn)' }}>
+              <Search className="w-4 h-4" />
+            </span>
+            <h3 className="wd-title font-heading">No appliances match</h3>
+            <p className={`text-xs max-w-sm ${muted}`}>
+              Try a different search term or category.
+            </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className={`px-4 py-2 rounded-lg text-xs font-semibold border border-[var(--wd-line)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${focusRing}`}
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : viewMode === 'table' ? (
+          <div className="wd-card !p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[880px] text-left text-[13px] border-collapse">
+                <thead>
+                  <tr className="border-b border-[var(--wd-line)] text-[11px] font-medium text-slate-400">
+                    <th className="py-3 pl-5 pr-4 font-medium">Appliance</th>
+                    <th className="py-3 px-4 font-medium">Category</th>
+                    <th className="py-3 px-4 font-medium">Room</th>
+                    <th className="py-3 px-4 font-medium text-right">Draw now</th>
+                    <th className="py-3 px-4 font-medium text-right">Today (kWh)</th>
+                    <th className="py-3 px-4 font-medium text-right">Monthly est.</th>
+                    <th className="py-3 px-4 font-medium text-center">Breaker</th>
+                    <th className="py-3 pl-4 pr-5 font-medium text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAppliances.map((app) => {
+                    const Icon = getCategoryIcon(app.category);
+                    const color = applianceColor(app.name);
+                    const drawW = drawOf(app);
+                    const daily = dailyOf(app);
+                    const monthly = toNum(app.monthly_cost_inr);
+                    const dim = app.is_active ? '' : 'opacity-60';
 
-                  <button
-                    onClick={() => handleToggle(app)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      app.is_active ? 'bg-brand-emerald shadow-sm shadow-emerald-500/20' : 'bg-slate-300 dark:bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        app.is_active ? 'translate-x-4' : 'translate-x-0'
-                      }`}
+                    return (
+                      <tr
+                        key={app.id}
+                        className="border-t border-[var(--wd-line)] first:border-t-0 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors"
+                      >
+                        <td className="py-3 pl-5 pr-4">
+                          <div className={`flex items-center gap-3 ${dim}`}>
+                            <span
+                              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                              style={tileStyle(color)}
+                            >
+                              <Icon className="w-4 h-4" />
+                            </span>
+                            <div>
+                              <div className="font-medium text-slate-900 dark:text-white">{app.name}</div>
+                              <div className={`text-[11px] font-mono ${muted}`}>Rated {app.power_watts} W</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className={`py-3 px-4 ${muted} ${dim}`}>{app.category}</td>
+
+                        <td className={`py-3 px-4 ${muted} ${dim}`}>{app.room || 'General'}</td>
+
+                        <td className="py-3 px-4 text-right">
+                          {!app.is_active ? (
+                            <span className="font-mono text-slate-400">Off</span>
+                          ) : drawW == null ? (
+                            <span className="font-mono text-slate-400">—</span>
+                          ) : (
+                            <div className="flex items-center justify-end gap-3">
+                              <LoadBar share={shareOf(drawW)} color={color} />
+                              <span className="w-16 font-mono font-medium tabular-nums text-slate-900 dark:text-white">
+                                {Math.round(drawW).toLocaleString('en-IN')} W
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className={`py-3 px-4 text-right font-mono tabular-nums text-slate-700 dark:text-slate-300 ${dim}`}>
+                          {daily == null ? '—' : daily.toFixed(2)}
+                        </td>
+
+                        <td className={`py-3 px-4 text-right font-mono font-medium tabular-nums text-slate-900 dark:text-white ${dim}`}>
+                          {monthly == null ? '—' : fmtMoney(monthly)}
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <BreakerSwitch
+                            on={app.is_active}
+                            label={`${app.is_active ? 'Turn off' : 'Turn on'} ${app.name}`}
+                            onClick={() => handleToggle(app)}
+                          />
+                        </td>
+
+                        <td className="py-3 pl-4 pr-5">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(app)}
+                              aria-label={`Edit ${app.name}`}
+                              title="Edit appliance"
+                              className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${focusRing}`}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(app.id, app.name)}
+                              aria-label={`Delete ${app.name}`}
+                              title="Remove appliance"
+                              className={`p-1.5 rounded-lg text-slate-400 hover:text-brand-coral hover:bg-brand-coral/10 transition-colors ${focusRing}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredAppliances.map((app) => {
+              const Icon = getCategoryIcon(app.category);
+              const color = applianceColor(app.name);
+              const drawW = drawOf(app);
+              const monthly = toNum(app.monthly_cost_inr);
+              const dim = app.is_active ? '' : 'opacity-60';
+
+              return (
+                <div key={app.id} className="wd-card flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className={`flex items-center gap-3 ${dim}`}>
+                      <span
+                        className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                        style={tileStyle(color)}
+                      >
+                        <Icon className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <h4 className="text-sm font-semibold leading-tight text-slate-900 dark:text-white">
+                          {app.name}
+                        </h4>
+                        <p className={`text-[11px] mt-0.5 ${muted}`}>
+                          {app.room || 'General'} · {app.category}
+                        </p>
+                      </div>
+                    </div>
+
+                    <BreakerSwitch
+                      on={app.is_active}
+                      label={`${app.is_active ? 'Turn off' : 'Turn on'} ${app.name}`}
+                      onClick={() => handleToggle(app)}
                     />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 dark:border-white/5 text-xs font-mono">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-sans">Power Draw</span>
-                    <span className="font-bold text-slate-900 dark:text-white tabular-nums">
-                      {app.is_active ? `${app.power_watts} W` : '0 W'}
-                    </span>
                   </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block font-sans">Monthly Est.</span>
-                    <span className="font-bold text-slate-900 dark:text-white tabular-nums">
-                      ₹{Math.round(app.monthly_cost_inr || 320).toLocaleString()}
-                    </span>
+
+                  <div className={`space-y-3 ${dim}`}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <span className={`block text-[11px] ${muted}`}>Draw now</span>
+                        <span className="font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                          {!app.is_active
+                            ? 'Off'
+                            : drawW == null
+                              ? '—'
+                              : `${Math.round(drawW).toLocaleString('en-IN')} W`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className={`block text-[11px] ${muted}`}>Monthly est.</span>
+                        <span className="font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
+                          {monthly == null ? '—' : fmtMoney(monthly)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="wd-track" aria-hidden="true">
+                      <div className="wd-fill" style={{ '--c': color, width: `${shareOf(drawW)}%` }} />
+                    </div>
+                    <p className={`text-[11px] font-mono ${muted}`}>Rated {app.power_watts} W</p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-1 pt-3 mt-auto border-t border-[var(--wd-line)]">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(app)}
+                      className={`px-2 py-1 rounded-lg text-xs inline-flex items-center gap-1.5 text-slate-500 dark:text-[#A1A6AE] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${focusRing}`}
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(app.id, app.name)}
+                      className={`px-2 py-1 rounded-lg text-xs inline-flex items-center gap-1.5 text-slate-500 dark:text-[#A1A6AE] hover:text-brand-coral hover:bg-brand-coral/10 transition-colors ${focusRing}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete</span>
+                    </button>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
 
-                <div className="flex items-center justify-end gap-2 pt-3 mt-3 border-t border-slate-100 dark:border-white/5">
-                  <button
-                    onClick={() => handleOpenEdit(app)}
-                    className="p-1 rounded text-slate-400 hover:text-slate-900 dark:hover:text-white text-xs inline-flex items-center gap-1"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(app.id, app.name)}
-                    className="p-1 rounded text-slate-400 hover:text-red-500 text-xs inline-flex items-center gap-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {appliances.length > 0 && filteredAppliances.length > 0 && (
+          <p className={`mt-3 text-[11px] font-mono ${muted}`}>
+            Showing {filteredAppliances.length} of {appliances.length} appliances
+          </p>
+        )}
+      </div>
 
-      {/* Add / Edit Modal */}
+      {/* Add / edit modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             onClick={() => setIsModalOpen(false)}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            aria-hidden="true"
           />
 
-          <div className="relative w-full max-w-md rounded-3xl glass-panel-elevated p-6 z-10 space-y-4 animate-in fade-in zoom-in-95 duration-150 border border-white/60 dark:border-white/10 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200/50 dark:border-white/10">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white font-heading">
-                {editingAppliance ? 'Edit Appliance Circuit' : 'Register New Appliance'}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="appliance-modal-title"
+            className="wd-card wd-pop relative w-full max-w-md z-10 space-y-4 shadow-2xl"
+            style={{ transformOrigin: 'center' }}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--wd-line)]">
+              <h3
+                id="appliance-modal-title"
+                className="text-base font-bold font-heading text-slate-900 dark:text-white"
+              >
+                {editingAppliance ? 'Edit appliance' : 'Add appliance'}
               </h3>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+                aria-label="Close"
+                className={`w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors ${focusRing}`}
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitModal} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSubmitModal} className="space-y-4 text-xs">
               <div>
-                <label className="font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                  Appliance Name
+                <label
+                  htmlFor="appliance-name"
+                  className="font-medium text-slate-700 dark:text-slate-300 block mb-1.5"
+                >
+                  Name
                 </label>
                 <input
+                  id="appliance-name"
                   type="text"
+                  autoFocus
                   placeholder="e.g. Inverter Air Conditioner"
                   value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  className={inputCls}
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-medium text-slate-700 dark:text-slate-300 block mb-1">
+                  <label
+                    htmlFor="appliance-category"
+                    className="font-medium text-slate-700 dark:text-slate-300 block mb-1.5"
+                  >
                     Category
                   </label>
                   <select
+                    id="appliance-category"
                     value={formData.category}
-                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan"
+                    onChange={(e) => setFormData((prev) => ({ ...prev, category: e.target.value }))}
+                    className={inputCls}
                   >
-                    <option value="Cooling">Cooling</option>
-                    <option value="Kitchen">Kitchen</option>
-                    <option value="Heating">Heating</option>
-                    <option value="Entertainment">Entertainment</option>
-                    <option value="Computing">Computing</option>
-                    <option value="Lighting">Lighting</option>
-                    <option value="General">General</option>
+                    {modalCategories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                    Room / Location
+                  <label
+                    htmlFor="appliance-room"
+                    className="font-medium text-slate-700 dark:text-slate-300 block mb-1.5"
+                  >
+                    Room
                   </label>
                   <input
+                    id="appliance-room"
                     type="text"
                     placeholder="e.g. Master Bedroom"
                     value={formData.room}
-                    onChange={(e) => setFormData(prev => ({ ...prev, room: e.target.value }))}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-slate-900 dark:text-white focus:outline-none focus:border-brand-cyan"
+                    onChange={(e) => setFormData((prev) => ({ ...prev, room: e.target.value }))}
+                    className={inputCls}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                    Rated Power (Watts)
+                  <label
+                    htmlFor="appliance-power"
+                    className="font-medium text-slate-700 dark:text-slate-300 block mb-1.5"
+                  >
+                    Rated power (W)
                   </label>
                   <input
+                    id="appliance-power"
                     type="number"
                     min="1"
                     max="10000"
                     value={formData.power_watts}
-                    onChange={(e) => setFormData(prev => ({ ...prev, power_watts: parseInt(e.target.value) || 0 }))}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-brand-cyan"
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, power_watts: parseInt(e.target.value) || 0 }))
+                    }
+                    className={`${inputCls} font-mono`}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="font-medium text-slate-700 dark:text-slate-300 block mb-1">
-                    Standby Power (Watts)
+                  <label
+                    htmlFor="appliance-standby"
+                    className="font-medium text-slate-700 dark:text-slate-300 block mb-1.5"
+                  >
+                    Standby power (W)
                   </label>
                   <input
+                    id="appliance-standby"
                     type="number"
                     step="0.5"
                     min="0"
                     value={formData.standby_watts}
-                    onChange={(e) => setFormData(prev => ({ ...prev, standby_watts: parseFloat(e.target.value) || 0 }))}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-white/10 bg-white/70 dark:bg-white/5 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-brand-cyan"
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, standby_watts: parseFloat(e.target.value) || 0 }))
+                    }
+                    className={`${inputCls} font-mono`}
                   />
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  Initial Breaker State
-                </span>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
-                    className="rounded accent-brand-emerald"
-                  />
-                  <span className="text-slate-600 dark:text-slate-300 font-mono">
-                    {formData.is_active ? 'Circuit Active' : 'Circuit Open'}
-                  </span>
-                </label>
-              </div>
+              <label className="flex items-center justify-between gap-3 pt-1 cursor-pointer">
+                <span className="font-medium text-slate-700 dark:text-slate-300">Start switched on</span>
+                <input
+                  type="checkbox"
+                  checked={formData.is_active}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, is_active: e.target.checked }))}
+                  className="w-4 h-4 rounded accent-brand-emerald"
+                />
+              </label>
 
-              <div className="pt-3 border-t border-slate-200/50 dark:border-white/10 flex items-center justify-end gap-2.5">
+              <div className="pt-4 border-t border-[var(--wd-line)] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-full glass-pill text-slate-600 dark:text-slate-300 text-xs font-medium"
+                  className={`px-4 py-2 rounded-lg border border-[var(--wd-line)] text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors ${focusRing}`}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-brand-royal dark:hover:bg-slate-100 text-xs font-semibold shadow-sm transition-all"
+                  disabled={saving}
+                  className={`px-4 py-2 rounded-lg bg-brand-royal text-white text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 ${focusRing}`}
                 >
-                  {editingAppliance ? 'Save Changes' : 'Register Appliance'}
+                  {saving ? 'Saving…' : editingAppliance ? 'Save changes' : 'Add appliance'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 }
