@@ -1,5 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { fetchLive, fetchOverview, updateSimulationControl } from '../services/api';
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+
+import {
+  fetchLive,
+  fetchOverview,
+  updateSimulationControl,
+} from '../services/api';
 
 const SimulationContext = createContext();
 
@@ -25,9 +38,24 @@ export function SimulationProvider({ children }) {
   const [recentAnomalies, setRecentAnomalies] = useState([]);
   const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
 
+  // Keep refs synchronized with the latest state.
+  const liveTelemetryRef = useRef(liveTelemetry);
+  const isPausedRef = useRef(isPaused);
+  const requestIdRef = useRef(0);
+  const transitionTimerRef = useRef(null);
+
+  liveTelemetryRef.current = liveTelemetry;
+  isPausedRef.current = isPaused;
+
+  /* -----------------------------------------------
+     TOAST NOTIFICATIONS
+  ----------------------------------------------- */
+
   const addToast = useCallback((message, type = 'info') => {
     const id = Date.now() + Math.random();
+
     setToasts(prev => [...prev, { id, message, type }]);
+
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 4500);
@@ -37,57 +65,216 @@ export function SimulationProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Poll live telemetry periodically
+  /* -----------------------------------------------
+     SMOOTH TELEMETRY TRANSITIONS
+
+     Incoming backend readings are interpolated over
+     1.5 seconds instead of jumping instantly.
+
+     No random readings are generated here.
+  ----------------------------------------------- */
+
+  const updateTelemetrySmoothly = useCallback((newData) => {
+    if (!newData) return;
+
+    if (transitionTimerRef.current) {
+      clearInterval(transitionTimerRef.current);
+      transitionTimerRef.current = null;
+    }
+
+    const startData = { ...liveTelemetryRef.current };
+    const targetData = { ...newData };
+
+    const duration = 1500;
+    const startTime = performance.now();
+
+    transitionTimerRef.current = setInterval(() => {
+      if (isPausedRef.current) {
+        clearInterval(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+        return;
+      }
+
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Smooth ease-in/ease-out transition.
+      const easedProgress =
+        progress * progress * (3 - 2 * progress);
+
+      const nextData = { ...targetData };
+
+      // Interpolate numeric telemetry fields.
+      Object.keys(targetData).forEach((key) => {
+        const startValue = startData[key];
+        const endValue = targetData[key];
+
+        if (
+          typeof startValue === 'number' &&
+          typeof endValue === 'number' &&
+          Number.isFinite(startValue) &&
+          Number.isFinite(endValue)
+        ) {
+          nextData[key] =
+            startValue +
+            (endValue - startValue) * easedProgress;
+        }
+      });
+
+      setLiveTelemetry(nextData);
+
+      if (progress >= 1) {
+        setLiveTelemetry(targetData);
+        liveTelemetryRef.current = targetData;
+
+        clearInterval(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+    }, 100);
+  }, []);
+
+  /* -----------------------------------------------
+     LIVE TELEMETRY FETCHING
+
+     Normal speed: 5-second polling.
+     Higher speed: faster polling, with a 3-second
+     minimum to avoid excessive backend requests.
+  ----------------------------------------------- */
+
   const fetchLiveData = useCallback(async () => {
-    if (isPaused) return;
+    if (isPausedRef.current) return;
+
+    const requestId = ++requestIdRef.current;
+
     try {
       const data = await fetchLive();
-      setLiveTelemetry(data);
+
+      // Ignore stale responses and responses received
+      // after the simulation has been paused.
+      if (
+        requestId !== requestIdRef.current ||
+        isPausedRef.current
+      ) {
+        return;
+      }
+
+      updateTelemetrySmoothly(data);
     } catch (err) {
-      // Keep existing state if offline or restarting
+      // Retain the last valid readings if the backend
+      // is temporarily unavailable.
     }
-  }, [isPaused]);
+  }, [updateTelemetrySmoothly]);
+
+  /* -----------------------------------------------
+     POLLING INTERVAL
+  ----------------------------------------------- */
 
   useEffect(() => {
-    fetchLiveData();
-    const intervalMs = Math.max(800, Math.floor(2500 / speedMultiplier));
-    const timer = setInterval(fetchLiveData, intervalMs);
-    return () => clearInterval(timer);
-  }, [fetchLiveData, speedMultiplier]);
+    if (isPaused) {
+      requestIdRef.current += 1;
 
-  // Initial overview fetch for alerts count
+      if (transitionTimerRef.current) {
+        clearInterval(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+
+      return;
+    }
+
+    fetchLiveData();
+
+    const intervalMs = Math.max(
+      3000,
+      Math.floor(5000 / speedMultiplier)
+    );
+
+    const timer = setInterval(fetchLiveData, intervalMs);
+
+    return () => {
+      clearInterval(timer);
+      requestIdRef.current += 1;
+    };
+  }, [fetchLiveData, speedMultiplier, isPaused]);
+
+  /* -----------------------------------------------
+     INITIAL OVERVIEW FETCH FOR ALERTS
+  ----------------------------------------------- */
+
   useEffect(() => {
     fetchOverview()
       .then(res => {
         if (res.recent_anomalies) {
           setRecentAnomalies(res.recent_anomalies);
-          const unread = res.recent_anomalies.filter(a => !a.acknowledged).length;
+
+          const unread = res.recent_anomalies.filter(
+            a => !a.acknowledged
+          ).length;
+
           setUnreadAlertsCount(unread);
         }
       })
       .catch(() => {});
   }, []);
 
+  /* -----------------------------------------------
+     SIMULATION SPEED
+  ----------------------------------------------- */
+
   const changeSpeed = async (newSpeed) => {
     setSpeedMultiplier(newSpeed);
+
     try {
-      await updateSimulationControl({ speed_multiplier: newSpeed });
-      addToast(`Simulation speed adjusted to ${newSpeed}x`, 'info');
+      await updateSimulationControl({
+        speed_multiplier: newSpeed,
+      });
+
+      addToast(
+        `Simulation speed adjusted to ${newSpeed}x`,
+        'info'
+      );
     } catch {
-      // local fallback
+      // Local polling speed still updates.
     }
   };
 
+  /* -----------------------------------------------
+     PAUSE / RESUME
+  ----------------------------------------------- */
+
   const togglePause = async () => {
     const nextPaused = !isPaused;
+
     setIsPaused(nextPaused);
+    isPausedRef.current = nextPaused;
+
+    if (nextPaused) {
+      requestIdRef.current += 1;
+
+      if (transitionTimerRef.current) {
+        clearInterval(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+      }
+    }
+
     try {
-      await updateSimulationControl({ is_paused: nextPaused });
-      addToast(nextPaused ? 'Simulation paused' : 'Simulation resumed', 'info');
+      await updateSimulationControl({
+        is_paused: nextPaused,
+      });
+
+      addToast(
+        nextPaused
+          ? 'Simulation paused'
+          : 'Simulation resumed',
+        'info'
+      );
     } catch {
-      // local fallback
+      // Local pause/resume remains functional.
     }
   };
+
+  /* -----------------------------------------------
+     CONTEXT PROVIDER
+  ----------------------------------------------- */
 
   return (
     <SimulationContext.Provider
@@ -108,7 +295,9 @@ export function SimulationProvider({ children }) {
       }}
     >
       {children}
+
       {/* Toast Notification Container */}
+
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none">
         {toasts.map(toast => (
           <div
@@ -117,11 +306,12 @@ export function SimulationProvider({ children }) {
               toast.type === 'error'
                 ? 'bg-rose-950/90 border-brand-coral/50 text-white'
                 : toast.type === 'success'
-                ? 'bg-emerald-950/90 border-brand-emerald/50 text-white'
-                : 'bg-brand-navyLight/95 border-brand-cyan/40 text-slate-100'
+                  ? 'bg-emerald-950/90 border-brand-emerald/50 text-white'
+                  : 'bg-brand-navyLight/95 border-brand-cyan/40 text-slate-100'
             }`}
           >
             <span>{toast.message}</span>
+
             <button
               onClick={() => removeToast(toast.id)}
               className="ml-3 text-slate-400 hover:text-white text-xs font-bold"
@@ -137,6 +327,12 @@ export function SimulationProvider({ children }) {
 
 export function useSimulation() {
   const context = useContext(SimulationContext);
-  if (!context) throw new Error('useSimulation must be used within SimulationProvider');
+
+  if (!context) {
+    throw new Error(
+      'useSimulation must be used within SimulationProvider'
+    );
+  }
+
   return context;
 }
