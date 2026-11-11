@@ -1,6 +1,9 @@
 // API service connecting React frontend to FastAPI backend
 
-const BASE_URL = '/api';
+const API_HOST = typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '5174')
+  ? 'http://127.0.0.1:8000'
+  : '';
+const BASE_URL = `${API_HOST}/api`;
 
 export async function fetchOverview() {
   const res = await fetch(`${BASE_URL}/overview`);
