@@ -1,0 +1,239 @@
+/* =========================================================
+   WATTLUME DASHBOARD FOUNDATION (wd-*)
+   Semantic colours, one radius, one border weight, one easing.
+   Existing palette kept; amber and rose are status-only.
+========================================================= */
+
+:root {
+  --wd-royal: #4169E1;
+  --wd-cyan: #42D9E8;
+  --wd-good: #24C78B;   /* savings, efficient, under budget */
+  --wd-warn: #E3A82B;   /* peak hours, near budget (status only) */
+  --wd-bad:  #FF806B;   /* over budget, fault, anomaly (status only) */
+
+  --wd-surface: #FFFFFF;
+  --wd-surface-2: #F6F8FB;
+  --wd-line: rgba(15, 23, 42, 0.08);
+  --wd-text: #0F172A;
+  --wd-muted: #64748B;
+  --wd-faint: #94A3B8;
+
+  --wd-radius: 14px;
+  --wd-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --wd-dur: 420ms;
+
+  /* Fixed colour per appliance, identical in bars, charts and tables */
+  --wd-ap-ac: #4169E1;
+  --wd-ap-fridge: #42D9E8;
+  --wd-ap-geyser: #24C78B;
+  --wd-ap-washer: #A78BFA;
+  --wd-ap-tv: #C084FC;
+  --wd-ap-other: #94A3B8;
+}
+
+.dark {
+  --wd-surface: #202328;
+  --wd-surface-2: #292D33;
+  --wd-line: rgba(255, 255, 255, 0.08);
+  --wd-text: #F4F5F6;
+  --wd-muted: #A1A6AE;
+  --wd-faint: #858B94;
+  --wd-good: #3DD6A0;
+  --wd-warn: #F0B94A;
+  --wd-bad: #FF8F7D;
+}
+
+/* Surfaces: one border, one radius, no heavy shadows */
+.wd-card {
+  background: var(--wd-surface);
+  border: 1px solid var(--wd-line);
+  border-radius: var(--wd-radius);
+  padding: 20px;
+  transition: border-color var(--wd-dur) var(--wd-ease), box-shadow var(--wd-dur) var(--wd-ease);
+}
+.wd-card:hover { border-color: color-mix(in srgb, var(--wd-cyan) 35%, var(--wd-line)); }
+
+/* Flat group: divider-only, for content that doesn't need a box */
+.wd-group + .wd-group { border-top: 1px solid var(--wd-line); padding-top: 20px; margin-top: 20px; }
+
+.wd-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--wd-faint);
+}
+.wd-title { font-size: 14px; font-weight: 600; color: var(--wd-text); }
+
+/* KPI: the number is what the eye lands on */
+.wd-kpi { position: relative; padding-left: 18px; }
+.wd-kpi::before {
+  content: ""; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; border-radius: 3px;
+  background: var(--accent, var(--wd-royal));
+}
+.wd-kpi-label { font-size: 12px; color: var(--wd-muted); }
+.wd-kpi-value {
+  font-size: 34px; line-height: 1.1; font-weight: 700; color: var(--wd-text);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+.wd-kpi-unit {
+  margin-left: 6px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; font-weight: 400; color: var(--wd-faint); letter-spacing: 0;
+}
+.wd-accent-live { --accent: var(--wd-cyan); }
+.wd-accent-money { --accent: var(--wd-royal); }
+.wd-accent-good { --accent: var(--wd-good); }
+.wd-accent-warn { --accent: var(--wd-warn); }
+.wd-accent-bad { --accent: var(--wd-bad); }
+
+/* Delta: arrow + colour + plain label, never colour alone */
+.wd-delta {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 500;
+}
+.wd-delta-good { color: var(--wd-good); }
+.wd-delta-warn { color: var(--wd-warn); }
+.wd-delta-bad  { color: var(--wd-bad); }
+
+/* Status chips */
+.wd-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-weight: 500;
+  color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+}
+.wd-chip-live { --c: var(--wd-good); }
+.wd-chip-info { --c: var(--wd-royal); }
+.wd-chip-good { --c: var(--wd-good); }
+.wd-chip-warn { --c: var(--wd-warn); }
+.wd-chip-bad  { --c: var(--wd-bad); }
+.dark .wd-chip-info { --c: var(--wd-cyan); }
+
+/* Live telemetry dot: radar ping */
+.wd-live-dot { position: relative; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.wd-live-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid currentColor;
+  animation: wd-radar 2.2s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+@keyframes wd-radar { from { transform: scale(1); opacity: 0.8; } to { transform: scale(4); opacity: 0; } }
+
+/* Progress bars: colour comes from --c (use an appliance variable) */
+.wd-track { height: 6px; border-radius: 999px; background: var(--wd-surface-2); overflow: hidden; }
+.wd-fill {
+  height: 100%; border-radius: 999px; background: var(--c, var(--wd-royal));
+  transition: width 900ms var(--wd-ease);
+}
+
+/* Value-change flash: add the class when a reading updates */
+.wd-flash { animation: wd-flash 900ms var(--wd-ease); }
+@keyframes wd-flash {
+  from { color: var(--wd-cyan); text-shadow: 0 0 12px color-mix(in srgb, var(--wd-cyan) 55%, transparent); }
+  to   { text-shadow: 0 0 0 transparent; }
+}
+
+/* Entrance: one pattern, staggered with --i */
+.wd-enter { animation: wd-enter 600ms var(--wd-ease) calc(var(--i, 0) * 70ms) both; }
+@keyframes wd-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+
+/* Loading skeleton */
+.wd-skeleton {
+  border-radius: 8px; background: var(--wd-surface-2); position: relative; overflow: hidden;
+}
+.wd-skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--wd-cyan) 12%, transparent), transparent);
+  transform: translateX(-100%); animation: wd-shimmer 1.6s ease-in-out infinite;
+}
+@keyframes wd-shimmer { to { transform: translateX(100%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .wd-enter, .wd-flash, .wd-live-dot::after, .wd-skeleton::after { animation: none !important; }
+  .wd-fill, .wd-card { transition: none !important; }
+}
+/* Small pop for dropdowns and popovers */
+.wd-pop { animation: wd-pop 160ms var(--wd-ease) both; transform-origin: top right; }
+@keyframes wd-pop { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .wd-pop { animation: none !important; } }
+
+/* =========================================================
+   OVERVIEW (wd-ov-*)
+========================================================= */
+
+:root { --wd-glow: rgba(65, 105, 225, 0.40); }
+.dark { --wd-glow: rgba(66, 217, 232, 0.45); }
+
+/* KPI strip: one card, four cells separated by hairlines */
+.wd-ov-kpis {
+  display: grid; gap: 1px; overflow: hidden;
+  background: var(--wd-line);
+  border: 1px solid var(--wd-line);
+  border-radius: var(--wd-radius);
+}
+.wd-ov-kpi {
+  position: relative; overflow: hidden;
+  background: var(--wd-surface);
+  padding: 20px 20px 20px 26px;
+}
+.wd-ov-kpi::before { top: 20px; bottom: 20px; }
+.wd-ov-kpi::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%,
+    color-mix(in srgb, var(--wd-cyan) 9%, transparent) 47%,
+    rgba(255, 255, 255, 0.12) 50%, transparent 62%);
+  transform: translateX(-110%);
+  animation: wd-ov-sheen 9s ease-in-out calc(1.5s + var(--i, 0) * 1.2s) infinite;
+}
+@keyframes wd-ov-sheen {
+  0% { transform: translateX(-110%); }
+  14%, 100% { transform: translateX(110%); }
+}
+.wd-ov-live-value { color: var(--wd-royal); }
+.dark .wd-ov-live-value { color: var(--wd-cyan); }
+
+/* KPI icon: square tile; live variant gets breathing glow and expanding rings */
+.wd-ov-icon {
+  position: relative; width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--accent, var(--wd-royal)) 14%, transparent);
+  color: var(--accent, var(--wd-royal));
+}
+.wd-ov-icon-live { animation: wd-ov-breathe 2.8s ease-in-out infinite; }
+.wd-ov-icon-live::before,
+.wd-ov-icon-live::after {
+  content: ""; position: absolute; inset: 0; border-radius: 8px;
+  border: 1.5px solid var(--wd-cyan); opacity: 0; pointer-events: none;
+  animation: wd-ov-ring 2.8s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.wd-ov-icon-live::after { animation-delay: 1.4s; }
+@keyframes wd-ov-ring {
+  0% { transform: scale(0.8); opacity: 0.7; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+@keyframes wd-ov-breathe {
+  0%, 100% { box-shadow: 0 0 0 transparent; }
+  50% { box-shadow: 0 0 14px color-mix(in srgb, var(--wd-cyan) 45%, transparent); }
+}
+
+/* Chart: glowing stroke on the real Recharts curve */
+.wd-ov-chart .recharts-area-curve { filter: drop-shadow(0 0 5px var(--wd-glow)); }
+
+/* Appliance bars: fixed colour per appliance, light pulse travelling along */
+.wd-ov-bar {
+  position: relative; overflow: hidden; height: 100%; border-radius: 999px;
+  background: var(--c, var(--wd-royal));
+}
+.wd-ov-bar::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  transform: translateX(-120%);
+  animation: wd-ov-pulse 3.6s ease-in-out calc(1.5s + var(--i, 0) * 0.7s) infinite;
+}
+@keyframes wd-ov-pulse {
+  0% { transform: translateX(-120%); }
+  55%, 100% { transform: translateX(260%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wd-ov-kpi::after,
+  .wd-ov-icon-live,
+  .wd-ov-icon-live::before,
+  .wd-ov-icon-live::after,
+  .wd-ov-bar::after { animation: none !important; }
+}
