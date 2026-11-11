@@ -54,4 +54,4 @@ pnpm-debug.log*
 # Python testing and coverage
 .pytest_cache/
 .coverage
-htmlcov/
+htmlcov/frontend/src/index.css.backup
