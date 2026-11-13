@@ -175,7 +175,7 @@ wattlume/
 cd /path/to/wattlume
 
 # Install Python backend dependencies
-python3 -m pip install fastapi uvicorn sqlalchemy pandas numpy
+python3 -m pip install -r backend/requirements.txt
 ```
 
 ### 2. Setup Frontend
