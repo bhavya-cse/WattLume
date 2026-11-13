@@ -349,14 +349,16 @@ export default function AppliancesView() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-5 border-b border-[var(--wd-line)]">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-heading font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Appliances
-          </h2>
-          <p className={`text-sm mt-1 max-w-xl ${muted}`}>
-            Switch circuits on and off, see what each appliance draws right now, and what it costs per month.
-          </p>
+      <div className="wl-page-heading wl-heading-appliances flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[var(--wd-line)]">
+        <div className="wl-heading-main">
+          <div className="wl-heading-icon" aria-hidden="true">
+            <LayoutGrid className="w-6 h-6" strokeWidth={1.8} />
+          </div>
+          <div className="wl-heading-copy">
+            <span className="wl-heading-eyebrow">Connected devices</span>
+            <h2 className="wl-heading-title">Appliances</h2>
+            <p>Switch circuits, monitor live power draw and keep track of appliance costs.</p>
+          </div>
         </div>
 
         <button
