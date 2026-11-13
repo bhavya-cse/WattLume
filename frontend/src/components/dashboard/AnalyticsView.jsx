@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend
@@ -22,16 +22,31 @@ export default function AnalyticsView() {
   const [loading, setLoading] = useState(true);
   const [analyticsData, setAnalyticsData] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const requestId = useRef(0);
 
   const loadData = async (range) => {
+    const currentRequest = ++requestId.current;
     setLoading(true);
+
     try {
       const data = await fetchAnalytics(range);
+
+      if (currentRequest !== requestId.current) return;
+
+      if (data.range !== range) {
+        throw new Error(`Requested ${range}, but API returned ${data.range}`);
+      }
+
       setAnalyticsData(data);
     } catch (err) {
-      console.error(err);
+      if (currentRequest === requestId.current) {
+        console.error('Analytics loading failed:', err);
+        setAnalyticsData(null);
+      }
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -58,17 +73,16 @@ export default function AnalyticsView() {
     <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
 
       {/* View Header with Horizon Filter */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/70 dark:border-white/10 pb-4">
-        <div>
-          <span className="text-xs font-mono font-medium text-slate-500 uppercase tracking-wider">
-            Chronological Analysis
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-heading font-extrabold tracking-tight text-slate-900 dark:text-white">
-            Energy Analytics
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Historical consumption trends, diurnal demand curves, and carbon footprints.
-          </p>
+      <div className="wl-page-heading wl-heading-analytics flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/70 dark:border-white/10 pb-5">
+        <div className="wl-heading-main">
+          <div className="wl-heading-icon" aria-hidden="true">
+            <Activity className="w-6 h-6" strokeWidth={1.8} />
+          </div>
+          <div className="wl-heading-copy">
+            <span className="wl-heading-eyebrow">Chronological analysis</span>
+            <h2 className="wl-heading-title">Energy Analytics</h2>
+            <p>Historical consumption trends, diurnal demand curves, and carbon footprints.</p>
+          </div>
         </div>
 
         {/* Range Selector Pill */}
@@ -76,7 +90,12 @@ export default function AnalyticsView() {
           {ranges.map((r) => (
             <button
               key={r.id}
-              onClick={() => setSelectedRange(r.id)}
+              onClick={() => {
+                if (selectedRange !== r.id) {
+                  setAnalyticsData(null);
+                  setSelectedRange(r.id);
+                }
+              }}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold font-mono transition-all duration-150 ${
                 selectedRange === r.id
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
@@ -202,7 +221,7 @@ export default function AnalyticsView() {
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.4} />
                 <XAxis dataKey="day_name" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}k`} />
+                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
@@ -284,7 +303,7 @@ export default function AnalyticsView() {
               Appliance Fleet Apportionment
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Ranked breakdown of appliance power ratings and estimated financial impact.
+              Historical appliance usage and estimated costs based on recent daily averages.
             </p>
           </div>
 
@@ -310,7 +329,7 @@ export default function AnalyticsView() {
                 <th className="py-3 px-3">Daily Energy</th>
                 <th className="py-3 px-3">Daily Cost</th>
                 <th className="py-3 px-3">Monthly Cost</th>
-                <th className="py-3 px-3">Share</th>
+                <th className="py-3 px-3">Share of Mapped Usage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -321,10 +340,18 @@ export default function AnalyticsView() {
                   </td>
                   <td className="py-3 px-3 font-sans text-slate-500">{app.room}</td>
                   <td className="py-3 px-3 text-slate-700 dark:text-slate-300">{app.power_watts} W</td>
-                  <td className="py-3 px-3 font-bold text-brand-blue dark:text-brand-cyan">{app.daily_energy_kwh} kWh</td>
-                  <td className="py-3 px-3 text-brand-emerald">{currency}{app.daily_cost_inr}</td>
-                  <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">{currency}{app.monthly_cost_inr}</td>
-                  <td className="py-3 px-3 font-bold">{app.percentage_share}%</td>
+                  <td className="py-3 px-3 font-bold text-brand-blue dark:text-brand-cyan">
+                    {app.measurement_available ? `${app.daily_energy_kwh} kWh` : 'Not measured'}
+                  </td>
+                  <td className="py-3 px-3 text-brand-emerald">
+                    {app.measurement_available ? `${currency}${app.daily_cost_inr}` : '—'}
+                  </td>
+                  <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">
+                    {app.measurement_available ? `${currency}${app.monthly_cost_inr}` : '—'}
+                  </td>
+                  <td className="py-3 px-3 font-bold">
+                    {app.measurement_available ? `${app.percentage_share}%` : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
