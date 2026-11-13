@@ -4,16 +4,10 @@ import math
 import random
 from datetime import datetime, timedelta, date
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.models import (
-    Appliance,
-    HourlyReading,
-    DailyAggregate,
-    TariffSetting,
-    AnomalyLog,
-    SimulationConfig,
-)
+from backend.models import Appliance, HourlyReading, DailyAggregate, TariffSetting, AnomalyLog, SimulationConfig, HistoricalReading
 
 
 # ============================================================
@@ -26,7 +20,8 @@ from backend.models import (
 
 _LIVE_APPLIANCE_CACHE = {}
 
-
+_DATASET_REPLAY_TIME = None
+_DATASET_LAST_WALL_TIME = None
 # ============================================================
 # DEFAULT APPLIANCES
 # ============================================================
@@ -654,144 +649,138 @@ def initialize_database_seeds(
 
 def get_current_live_telemetry(db: Session) -> dict:
     """
-    Computes stable live telemetry reflecting current appliance
-    states.
-
-    Power remains constant between requests until an appliance
-    state changes or the backend process restarts.
-
-    This function does not generate random readings on every
-    API request.
+    Replays historical household energy readings using the
+    existing simulation speed and pause controls.
     """
+
+    global _DATASET_REPLAY_TIME
+    global _DATASET_LAST_WALL_TIME
 
     appliances = db.query(Appliance).all()
 
-    now = datetime.utcnow()
+    first_reading = (
+        db.query(HistoricalReading)
+        .order_by(HistoricalReading.timestamp.asc())
+        .first()
+    )
 
-    total_power_w = 0.0
-    active_count = 0
+    last_reading = (
+        db.query(HistoricalReading)
+        .order_by(HistoricalReading.timestamp.desc())
+        .first()
+    )
 
-    breakdown = {}
+    if first_reading is None or last_reading is None:
+        raise RuntimeError(
+            "Historical dataset is empty. Import the dataset first."
+        )
 
-    current_keys = set()
+    config = db.query(SimulationConfig).first()
 
-    for app in appliances:
+    speed = max(
+        0.0,
+        float(config.speed_multiplier if config else 1.0)
+    )
 
-        key = app.id if app.id is not None else app.name
+    paused = bool(config.is_paused) if config else False
 
-        current_keys.add(key)
+    wall_now = datetime.utcnow()
 
-        if app.is_active:
+    if _DATASET_REPLAY_TIME is None:
+        _DATASET_REPLAY_TIME = first_reading.timestamp
 
-            active_count += 1
+    if _DATASET_LAST_WALL_TIME is not None and not paused:
+        elapsed = max(
+            0.0,
+            (wall_now - _DATASET_LAST_WALL_TIME).total_seconds()
+        )
 
-            cached = _LIVE_APPLIANCE_CACHE.get(key)
+        _DATASET_REPLAY_TIME += timedelta(
+            seconds=elapsed * speed
+        )
 
-            if (
-                cached is None
-                or cached["is_active"] != app.is_active
-            ):
+    _DATASET_LAST_WALL_TIME = wall_now
 
-                hour = now.hour
-                is_weekend = now.weekday() >= 5
+    duration = (
+        last_reading.timestamp - first_reading.timestamp
+    ).total_seconds()
 
-                duty = calculate_appliance_hourly_factor(
-                    app.name,
-                    hour,
-                    is_weekend
-                )
+    if _DATASET_REPLAY_TIME > last_reading.timestamp:
+        if duration > 0:
+            offset = (
+                _DATASET_REPLAY_TIME - first_reading.timestamp
+            ).total_seconds()
 
-                # Duty-cycle averaged load.
-                # No random full-power/standby switching.
-
-                draw = (
-                    app.standby_watts
-                    + (
-                        app.power_watts - app.standby_watts
-                    ) * duty
-                )
-
-                _LIVE_APPLIANCE_CACHE[key] = {
-                    "is_active": True,
-                    "draw": round(draw, 1)
-                }
-
-            draw = _LIVE_APPLIANCE_CACHE[key]["draw"]
-
+            _DATASET_REPLAY_TIME = (
+                first_reading.timestamp
+                + timedelta(seconds=offset % duration)
+            )
         else:
+            _DATASET_REPLAY_TIME = first_reading.timestamp
 
-            draw = 0.0
+    reading = (
+        db.query(HistoricalReading)
+        .filter(
+            HistoricalReading.timestamp <= _DATASET_REPLAY_TIME
+        )
+        .order_by(HistoricalReading.timestamp.desc())
+        .first()
+    )
 
-            _LIVE_APPLIANCE_CACHE[key] = {
-                "is_active": False,
-                "draw": 0.0
-            }
+    if reading is None:
+        reading = first_reading
 
-        breakdown[app.name] = round(draw, 1)
-
-        total_power_w += draw
-
-    # Remove entries belonging to deleted appliances.
-
-    for key in list(_LIVE_APPLIANCE_CACHE.keys()):
-
-        if key not in current_keys:
-            del _LIVE_APPLIANCE_CACHE[key]
-
-    # Stable nominal electrical readings.
+    total_power_kw = max(0.0, reading.consumption_kw)
+    total_power_w = total_power_kw * 1000.0
 
     voltage = 230.0
     power_factor = 0.95
 
     current = round(
-        total_power_w / max(
-            1.0,
-            voltage * power_factor
-        ),
+        total_power_w / (voltage * power_factor),
         2
     )
 
-    frequency = 50.0
-
-    # Retrieve today's existing accumulated energy.
-
-    today_str = now.strftime("%Y-%m-%d")
-
-    today_agg = (
-        db.query(DailyAggregate)
-        .filter(
-            DailyAggregate.date == today_str
-        )
-        .first()
+    day_start = reading.timestamp.replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
     )
 
-    today_kwh = (
-        today_agg.total_energy_kwh
-        if today_agg
-        else 0.0
+    accumulated_kw_minutes = (
+        db.query(func.sum(HistoricalReading.consumption_kw))
+        .filter(
+            HistoricalReading.timestamp >= day_start,
+            HistoricalReading.timestamp <= reading.timestamp
+        )
+        .scalar()
+        or 0.0
+    )
+
+    today_kwh = accumulated_kw_minutes / 60.0
+
+    active_count = sum(
+        1 for appliance in appliances if appliance.is_active
     )
 
     return {
         "current_power_watts": round(total_power_w, 1),
-        "current_power_kw": round(
-            total_power_w / 1000.0,
-            3
-        ),
+        "current_power_kw": round(total_power_kw, 3),
         "voltage_v": voltage,
         "current_a": current,
         "power_factor": power_factor,
-        "frequency_hz": frequency,
+        "frequency_hz": 50.0,
         "today_energy_kwh": round(today_kwh, 2),
-        "simulated_time": now.strftime(
+        "simulated_time": reading.timestamp.strftime(
             "%Y-%m-%d %H:%M:%S"
         ),
-        "is_live": True,
+        "is_live": False,
         "status": (
             "Optimal"
             if total_power_w < 3500
             else "High Load"
         ),
         "appliances_active_count": active_count,
-        "total_appliances_count": len(appliances),
-        "breakdown": breakdown
+        "total_appliances_count": len(appliances)
     }
