@@ -78,3 +78,11 @@ class SimulationConfig(Base):
     is_paused = Column(Boolean, default=False)
     anomaly_sensitivity = Column(Float, default=1.3)   # 1.3 = 30% above baseline
     last_tick_time = Column(DateTime, default=datetime.utcnow)
+class HistoricalReading(Base):
+    __tablename__ = "historical_readings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, index=True, nullable=False)
+    consumption_kw = Column(Float, nullable=False)
+    solar_generation_kw = Column(Float, default=0.0)
+    appliance_breakdown = Column(Text, default="{}")
