@@ -342,8 +342,12 @@ export default function OverviewView({ onNavigateView }) {
 
   const simHour = parseInt((liveTelemetry.simulated_time || '').slice(11, 13), 10);
   const lowestHour = hourlyChart
-    .filter((h) => Number.isNaN(simHour) || h.hour <= simHour)
-    .reduce((min, h) => (!min || h.energy_kwh < min.energy_kwh ? h : min), null);
+  .filter((h) => h.energy_kwh != null)
+  .reduce(
+    (min, h) =>
+      !min || h.energy_kwh < min.energy_kwh ? h : min,
+    null
+  );
 
   /* Largest appliance share (derived from data) */
 
@@ -392,14 +396,20 @@ export default function OverviewView({ onNavigateView }) {
       {/* HEADER */}
 
       <div
-        className="wd-enter flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-4 border-b border-[var(--wd-line)]"
+        className="wl-page-heading wl-heading-overview flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-[var(--wd-line)]"
         style={{ '--i': 0 }}
       >
-        <div>
-          <p className="wd-eyebrow">{getGreeting()}</p>
-          <h2 className="text-2xl sm:text-3xl font-heading font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Here's your energy overview.
-          </h2>
+        <div className="wl-heading-main">
+          <div className="wl-heading-icon" aria-hidden="true">
+            <Zap className="w-6 h-6" strokeWidth={1.8} />
+          </div>
+          <div className="wl-heading-copy">
+            <span className="wl-heading-eyebrow">{getGreeting()}</span>
+            <h2 className="wl-heading-title">
+              Here's your energy overview.
+            </h2>
+            <p>Live usage, appliance activity and today's energy performance.</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5">
@@ -605,13 +615,21 @@ export default function OverviewView({ onNavigateView }) {
                             )}
                           </div>
 
-                          <div className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
-                            {data.kwh.toFixed(3)} kWh
-                          </div>
+                          {data.kwh == null ? (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                              No reading available
+                            </div>
+                          ) : (
+                            <>
+                              <div className="text-sm font-bold text-slate-900 dark:text-white tabular-nums">
+                                {data.kwh.toFixed(3)} kWh
+                              </div>
 
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                            Est: ~{(data.kwh * 1000).toFixed(0)} W average circuit draw
-                          </div>
+                              <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                                Est: ~{(data.kwh * 1000).toFixed(0)} W average circuit draw
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     }
@@ -622,6 +640,13 @@ export default function OverviewView({ onNavigateView }) {
                 <Area
                   type="monotone"
                   dataKey="kwh"
+                  connectNulls={false}
+                  dot={{
+  r: 4,
+  stroke: lineColor,
+  strokeWidth: 2,
+  fill: isDark ? '#202328' : '#FFFFFF',
+}}
                   stroke={lineColor}
                   strokeWidth={2.5}
                   fillOpacity={1}
@@ -645,7 +670,7 @@ export default function OverviewView({ onNavigateView }) {
               <Clock className="w-3.5 h-3.5" />
               <span>
                 {lowestHour
-                  ? `Lowest hour so far: ${lowestHour.energy_kwh.toFixed(2)} kWh at ${lowestHour.time}`
+                  ? `Lowest hour in displayed profile: ${lowestHour.energy_kwh.toFixed(2)} kWh at ${lowestHour.time}`
                   : 'Waiting for hourly data'}
               </span>
             </span>
