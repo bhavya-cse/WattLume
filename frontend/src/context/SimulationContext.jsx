@@ -297,29 +297,45 @@ export function SimulationProvider({ children }) {
       {children}
 
       {/* Toast Notification Container */}
+      <div className="fixed bottom-5 right-5 z-[99999] flex flex-col gap-2.5 max-w-sm pointer-events-none">
+        {toasts.map(toast => {
+          const dark = document.documentElement.classList.contains('dark');
+          const bg = dark ? '#252A32' : '#F0F9FF';
+          const fg = dark ? '#FFFFFF' : '#172033';
 
-      <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto flex items-center justify-between p-3.5 rounded-xl border shadow-xl backdrop-blur-md text-sm transition-all animate-in slide-in-from-bottom-2 ${
-              toast.type === 'error'
-                ? 'bg-rose-950/90 border-brand-coral/50 text-white'
-                : toast.type === 'success'
-                  ? 'bg-emerald-950/90 border-brand-emerald/50 text-white'
-                  : 'bg-brand-navyLight/95 border-brand-cyan/40 text-slate-100'
-            }`}
-          >
-            <span>{toast.message}</span>
-
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-3 text-slate-400 hover:text-white text-xs font-bold"
+          return (
+            <div
+              key={toast.id}
+              className="pointer-events-auto flex items-center justify-between p-4 rounded-xl shadow-xl"
+              style={{
+                backgroundColor: bg,
+                color: fg,
+                border: '1px solid #64748B',
+                opacity: 1,
+                visibility: 'visible',
+                position: 'relative',
+                zIndex: 99999,
+              }}
             >
-              ✕
-            </button>
-          </div>
-        ))}
+              <span style={{
+                color: fg,
+                WebkitTextFillColor: fg,
+                fontWeight: 700,
+                fontSize: '15px',
+                opacity: 1,
+                visibility: 'visible',
+              }}>
+                {toast.message}
+              </span>
+              <button
+                onClick={() => removeToast(toast.id)}
+                style={{ color: fg, marginLeft: '12px', fontWeight: 700 }}
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
       </div>
     </SimulationContext.Provider>
   );
