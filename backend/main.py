@@ -1,17 +1,19 @@
 import os
 import io
 import csv
+import calendar
 import json
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from backend.database import engine, Base, get_db, SessionLocal
 from backend.models import (
-    Appliance, HourlyReading, DailyAggregate, TariffSetting,
+    Appliance, HourlyReading, DailyAggregate, TariffSetting, HistoricalReading,
     AnomalyLog, SimulationConfig
 )
 from backend.schemas import (
@@ -111,7 +113,12 @@ def get_overview(db: Session = Depends(get_db)):
     }
 
     # Hourly chart data for today
-    today_analytics = get_analytics_dataset(db, "today")
+    replay_time = datetime.strptime(
+        live["simulated_time"], "%Y-%m-%d %H:%M:%S"
+    )
+    today_analytics = get_analytics_dataset(
+        db, "today", as_of=replay_time
+    )
     # Top appliances breakdown
     appliances_analytics = today_analytics["appliances"]
 
@@ -314,10 +321,54 @@ def get_reports(
         description = "Weekly rolling consumption totals and aggregate efficiency trends."
 
     elif period == "monthly":
-        analytics_12m = get_analytics_dataset(db, "12m")
-        rows = analytics_12m["chart_data"]
+        # Aggregate historical readings inside SQLite instead of loading
+        # hundreds of thousands of full ORM objects into Python.
+        month_expr = func.strftime(
+            "%Y-%m", HistoricalReading.timestamp
+        )
+
+        monthly_rows = (
+            db.query(
+                month_expr.label("month_key"),
+                (
+                    func.sum(
+                        case(
+                            (
+                                HistoricalReading.consumption_kw > 0,
+                                HistoricalReading.consumption_kw
+                            ),
+                            else_=0.0
+                        )
+                    ) / 60.0
+                ).label("total_kwh")
+            )
+            .group_by(month_expr)
+            .order_by(month_expr)
+            .all()
+        )
+
+        rows = []
+
+        for index, item in enumerate(monthly_rows):
+            year, month = map(int, item.month_key.split("-"))
+            energy = round(float(item.total_kwh or 0.0), 2)
+            bill = compute_bill_for_kwh(energy, tariff)
+
+            month_label = f"{calendar.month_abbr[month]} '{str(year)[2:]}"
+            if index == len(monthly_rows) - 1:
+                month_label += " (partial)"
+
+            rows.append({
+                "month": month_label,
+                "total_kwh": energy,
+                "fixed_charge": bill["fixed_charge"],
+                "energy_charge": bill["energy_charge"],
+                "tax_inr": bill["tax_amount"],
+                "total_bill_inr": bill["total_bill"]
+            })
+
         title = "Monthly Energy & Expenditure Summary Report"
-        description = "Year-over-year monthly energy volume, tariff impact, and cost progression."
+        description = "Historical monthly consumption and estimated bills using the configured tariff. The final month represents a partial billing period."
 
     elif period == "appliances":
         analytics = get_analytics_dataset(db, "7d")
