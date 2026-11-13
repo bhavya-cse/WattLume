@@ -63,12 +63,28 @@ app.add_middleware(
 def health_check():
     return {
         "status": "healthy",
-        "service": "WattLume Energy Intelligence Platform",
-        "timestamp": datetime.utcnow().isoformat(),
+        "service": "WattLume Energy Intelligence Platform",        "timestamp": datetime.utcnow().isoformat(),
         "simulation_mode": "active"
     }
 
 @app.get("/api/live")
+@app.get("/api/health")
+def health_check(db: Session = Depends(get_db)):
+    database_status = "connected"
+
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        database_status = "disconnected"
+
+    return {
+        "status": "healthy" if database_status == "connected" else "degraded",
+        "service": "WattLume API",
+        "timestamp": datetime.utcnow().isoformat(),
+        "simulation_mode": True,
+        "database": database_status,
+    }
+
 def get_live(db: Session = Depends(get_db)):
     """Returns real-time electrical telemetry (W, kW, V, A, PF, Hz, today kWh)."""
     return get_current_live_telemetry(db)
