@@ -448,3 +448,12 @@
   .wl-preview .wl-chart-wipe { clip-path: none !important; }
   .wl-sweep, .wl-comet, .wl-scanline, .wl-peak-ping { display: none !important; }
 }
+
+/* Ensure toast messages remain readable in dark mode */
+.dark .wl-toast {
+  color: #ffffff !important;
+}
+
+.dark .wl-toast button {
+  color: #cbd5e1 !important;
+}
