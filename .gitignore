@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+
 *.so
 .Python
 env/
@@ -54,4 +56,11 @@ pnpm-debug.log*
 # Python testing and coverage
 .pytest_cache/
 .coverage
-htmlcov/frontend/src/index.css.backup
+htmlcov/
+
+# Temporary backup files
+*.bak
+*.backup
+*.backup-*
+*.before-*
+backup-*/
