@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, case
+from sqlalchemy import func, case, text
 from sqlalchemy.orm import Session
 
 from backend.database import engine, Base, get_db, SessionLocal
@@ -75,16 +75,19 @@ def health_check(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
     except Exception:
+        db.rollback()
         database_status = "disconnected"
 
     return {
         "status": "healthy" if database_status == "connected" else "degraded",
         "service": "WattLume API",
         "timestamp": datetime.utcnow().isoformat(),
-        "simulation_mode": True,
+        "simulation_mode": "active",
         "database": database_status,
     }
 
+
+@app.get("/api/live")
 def get_live(db: Session = Depends(get_db)):
     """Returns real-time electrical telemetry (W, kW, V, A, PF, Hz, today kWh)."""
     return get_current_live_telemetry(db)
