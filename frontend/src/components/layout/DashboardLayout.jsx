@@ -121,7 +121,7 @@ export default function DashboardLayout({
           onNavigateView={setActiveView}
         />
 
-        <main className="relative flex-1 pb-16">
+        <main className="wl-dashboard-glass relative flex-1 pb-16">
           {renderActiveView()}
         </main>
       </div>
