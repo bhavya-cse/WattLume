@@ -29,6 +29,7 @@ from backend.billing import (
 from backend.anomaly_detection import detect_recent_anomalies
 from backend.recommendations import generate_smart_insights_and_recommendations
 from backend.analytics import get_analytics_dataset
+from backend.gemini_chat import ChatRequest, generate_energy_assistant_reply
 
 # Initialize database schema
 Base.metadata.create_all(bind=engine)
@@ -67,7 +68,6 @@ def health_check():
         "simulation_mode": "active"
     }
 
-@app.get("/api/live")
 @app.get("/api/health")
 def health_check(db: Session = Depends(get_db)):
     database_status = "connected"
@@ -86,6 +86,16 @@ def health_check(db: Session = Depends(get_db)):
         "database": database_status,
     }
 
+
+
+@app.post("/api/chat")
+def chat_with_energy_assistant(
+    chat_request: ChatRequest,
+    db: Session = Depends(get_db),
+):
+    """Answer an energy question using current WattLume database context."""
+    answer = generate_energy_assistant_reply(db, chat_request)
+    return {"reply": answer}
 
 @app.get("/api/live")
 def get_live(db: Session = Depends(get_db)):
