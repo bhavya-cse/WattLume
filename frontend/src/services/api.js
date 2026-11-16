@@ -122,3 +122,17 @@ export async function resetSimulation() {
   if (!res.ok) throw new Error(`Failed to reset simulation: ${res.statusText}`);
   return res.json();
 }
+
+export async function sendEnergyAssistantMessage({ message, history = [], activeView = 'overview' }) {
+  const res = await fetch(`${BASE_URL}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, history, active_view: activeView }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || `Energy assistant request failed (${res.status})`);
+  }
+  return data;
+}
