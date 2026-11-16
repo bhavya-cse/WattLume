@@ -9,6 +9,7 @@ import InsightsView from '../dashboard/InsightsView';
 import BillingView from '../dashboard/BillingView';
 import ReportsView from '../dashboard/ReportsView';
 import SettingsView from '../dashboard/SettingsView';
+import EnergyAssistant from '../assistant/EnergyAssistant';
 
 export default function DashboardLayout({
   onBackToLanding,
@@ -124,6 +125,7 @@ export default function DashboardLayout({
         <main className="wl-dashboard-glass relative flex-1 pb-16">
           {renderActiveView()}
         </main>
+        <EnergyAssistant activeView={activeView} />
       </div>
     </div>
   );
