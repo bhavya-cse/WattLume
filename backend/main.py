@@ -61,14 +61,6 @@ app.add_middleware(
 )
 
 @app.get("/api/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "service": "WattLume Energy Intelligence Platform",        "timestamp": datetime.utcnow().isoformat(),
-        "simulation_mode": "active"
-    }
-
-@app.get("/api/health")
 def health_check(db: Session = Depends(get_db)):
     database_status = "connected"
 
