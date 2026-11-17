@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, case, text
+from sqlalchemy import func, case, text, extract
 from sqlalchemy.orm import Session
 
 from backend.database import engine, Base, get_db, SessionLocal
@@ -364,15 +364,15 @@ def get_reports(
         description = "Weekly rolling consumption totals and aggregate efficiency trends."
 
     elif period == "monthly":
-        # Aggregate historical readings inside SQLite instead of loading
-        # hundreds of thousands of full ORM objects into Python.
-        month_expr = func.strftime(
-            "%Y-%m", HistoricalReading.timestamp
-        )
+        # Aggregate historical readings by calendar month.
+        # extract() supports both PostgreSQL and SQLite.
+        year_expr = extract("year", HistoricalReading.timestamp)
+        month_expr = extract("month", HistoricalReading.timestamp)
 
         monthly_rows = (
             db.query(
-                month_expr.label("month_key"),
+                year_expr.label("year"),
+                month_expr.label("month"),
                 (
                     func.sum(
                         case(
@@ -385,15 +385,15 @@ def get_reports(
                     ) / 60.0
                 ).label("total_kwh")
             )
-            .group_by(month_expr)
-            .order_by(month_expr)
+            .group_by(year_expr, month_expr)
+            .order_by(year_expr, month_expr)
             .all()
         )
 
         rows = []
 
         for index, item in enumerate(monthly_rows):
-            year, month = map(int, item.month_key.split("-"))
+            year, month = int(item.year), int(item.month)
             energy = round(float(item.total_kwh or 0.0), 2)
             bill = compute_bill_for_kwh(energy, tariff)
 
