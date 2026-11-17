@@ -12,7 +12,7 @@ import {
   Layers
 } from 'lucide-react';
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from 'recharts';
 import { fetchBilling, updateTariff } from '../../services/api';
@@ -67,6 +67,29 @@ export default function BillingView() {
     loadData();
   }, []);
 
+  if (loading) {
+    return (
+      <div className="bill-page p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto" aria-busy="true">
+        <div className="space-y-2">
+          <div className="wd-skeleton h-4 w-36" />
+          <div className="wd-skeleton h-8 w-64" />
+          <div className="wd-skeleton h-4 w-96 max-w-full" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <div key={i} className="p-5 rounded-2xl glass-panel space-y-3">
+              <div className="wd-skeleton h-3 w-28" />
+              <div className="wd-skeleton h-9 w-24" />
+              <div className="wd-skeleton h-3 w-32" />
+            </div>
+          ))}
+        </div>
+        <div className="wd-skeleton h-64 w-full rounded-2xl" />
+        <div className="wd-skeleton h-80 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
   const handleSaveTariff = async (e) => {
     e.preventDefault();
     try {
@@ -83,10 +106,80 @@ export default function BillingView() {
   const dailyTrend = billingData?.daily_trend || [];
   const projectedTrend = billingData?.projected_trend || [];
 
-  const combinedTrajectory = [
-    ...dailyTrend.map(d => ({ day: d.day, actual_kwh: d.cumulative_kwh, projected_kwh: null })),
-    ...projectedTrend.map(p => ({ day: p.day, actual_kwh: null, projected_kwh: p.projected_kwh })),
-  ];
+  const lastActualDay = dailyTrend.length
+    ? Math.max(...dailyTrend.map(d => Number(d.day)))
+    : 0;
+  const lastActualKwh = dailyTrend.length
+    ? dailyTrend.reduce((latest, d) =>
+        Number(d.day) >= Number(latest.day) ? d : latest
+      ).cumulative_kwh
+    : 0;
+  const daysElapsed = Number(billingData?.days_elapsed || lastActualDay);
+  const averageDailyKwh = dailyTrend.length > 0
+    ? Number(billingData?.month_to_date_kwh || lastActualKwh) / dailyTrend.length
+    : 0;
+
+  const estimatedBridge = [];
+  if (lastActualDay > 0 && daysElapsed > lastActualDay && averageDailyKwh > 0) {
+    for (let day = lastActualDay + 1; day <= daysElapsed; day++) {
+      estimatedBridge.push({
+        day,
+        value: Number((
+          lastActualKwh + averageDailyKwh * (day - lastActualDay)
+        ).toFixed(2)),
+        status: 'estimated'
+      });
+    }
+  }
+
+  const trajectoryPoints = [
+    ...dailyTrend.map(d => ({
+      day: Number(d.day),
+      value: Number(d.cumulative_kwh),
+      status: 'actual'
+    })),
+    ...estimatedBridge,
+    ...projectedTrend.map(p => ({
+      day: Number(p.day),
+      value: Number(p.projected_kwh),
+      status: 'projected'
+    }))
+  ].sort((a, b) => a.day - b.day);
+
+  const firstEstimatedDay = estimatedBridge[0]?.day;
+  const lastEstimatedDay = estimatedBridge[estimatedBridge.length - 1]?.day;
+  const firstProjectedDay = projectedTrend.length
+    ? Number(projectedTrend[0].day)
+    : undefined;
+
+  const combinedTrajectory = trajectoryPoints
+    .filter((point, index, points) =>
+      index === 0 || point.day !== points[index - 1].day
+    )
+    .map(point => ({
+      day: point.day,
+      value: point.value,
+
+      // Each coloured line owns only its actual date range.
+      actualLine: point.status === 'actual' ? point.value : null,
+      estimatedLine: point.status === 'estimated' ? point.value : null,
+      projectedLine: point.status === 'projected' ? point.value : null,
+
+      // Exactly two adjacent points per transition.
+      actualTransitionLine:
+        point.day === lastActualDay ||
+        point.day === firstEstimatedDay
+          ? point.value : null,
+
+      projectedTransitionLine:
+        point.day === lastEstimatedDay ||
+        point.day === firstProjectedDay
+          ? point.value : null,
+
+      actual_kwh: point.status === 'actual' ? point.value : null,
+      estimated_kwh: point.status === 'estimated' ? point.value : null,
+      projected_kwh: point.status === 'projected' ? point.value : null
+    }));
 
   return (
     <div className="bill-page p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto">
@@ -493,6 +586,9 @@ export default function BillingView() {
                         {d.actual_kwh !== null && (
                           <p className="text-[#AD694B] dark:text-[#D99A78]">Accrued: {d.actual_kwh} kWh</p>
                         )}
+                        {d.estimated_kwh != null && (
+                          <p className="text-amber-600 dark:text-amber-400">Estimated: {d.estimated_kwh} kWh</p>
+                        )}
                         {d.projected_kwh !== null && (
                           <p className="text-brand-emerald">Projected: {d.projected_kwh} kWh</p>
                         )}
@@ -502,8 +598,118 @@ export default function BillingView() {
                   return null;
                 }}
               />
-              <Area type="monotone" dataKey="actual_kwh" stroke="#AD694B" strokeWidth={2} fill="url(#accruedGrad)" name="Accrued" />
-              <Area type="monotone" dataKey="projected_kwh" stroke="#82916F" strokeWidth={2} strokeDasharray="3 3" fill="url(#projGrad)" name="Projected" />
+              <defs>
+                <linearGradient
+                  id="trajectoryColorGradient"
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="0"
+                >
+                  <stop offset="0%" stopColor="#AD694B" stopOpacity={0.23} />
+                  <stop offset="36%" stopColor="#AD694B" stopOpacity={0.23} />
+                  <stop offset="37%" stopColor="#D6A15D" stopOpacity={0.20} />
+                  <stop offset="56%" stopColor="#D6A15D" stopOpacity={0.20} />
+                  <stop offset="57%" stopColor="#82916F" stopOpacity={0.18} />
+                  <stop offset="100%" stopColor="#82916F" stopOpacity={0.18} />
+                </linearGradient>
+              </defs>
+
+              {/* One continuous fill across the entire month */}
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke="#64748B"
+                strokeWidth={2.5}
+                fill="url(#trajectoryColorGradient)"
+                name="Cumulative consumption"
+                dot={(props) => {
+                  const day = Number(props.payload?.day);
+                  const color =
+                    day <= 11 ? "#AD694B" :
+                    day <= 17 ? "#D6A15D" :
+                    "#82916F";
+
+                  return (
+                    <circle
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={4}
+                      fill={color}
+                      stroke="#FFFFFF"
+                      strokeWidth={2}
+                    />
+                  );
+                }}
+                activeDot={{
+                  r: 5,
+                  stroke: "#42D9E8",
+                  strokeWidth: 2,
+                  fill: "#FFFFFF",
+                }}
+                isAnimationActive={false}
+              />
+
+              {/* Recorded, estimated and projected sections */}
+              <Line
+                type="monotone"
+                dataKey="actualLine"
+                stroke="#8493A5"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls={false}
+                name="Recorded"
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="estimatedLine"
+                stroke="#D6A15D"
+                strokeWidth={2.5}
+                strokeDasharray="5 5"
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls={false}
+                name="Estimated"
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="projectedLine"
+                stroke="#82916F"
+                strokeWidth={2.5}
+                strokeDasharray="3 3"
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls={false}
+                name="Projected"
+                isAnimationActive={false}
+              />
+
+              {/* Boundary connectors: day 11–12 and day 17–18 */}
+              <Line
+                type="monotone"
+                dataKey="actualTransitionLine"
+                stroke="#D6A15D"
+                strokeWidth={2.5}
+                dot={false}
+                connectNulls={false}
+                activeDot={false}
+                name="Recorded to estimated"
+                isAnimationActive={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="projectedTransitionLine"
+                stroke="#82916F"
+                strokeWidth={2.5}
+                dot={false}
+                connectNulls={false}
+                activeDot={false}
+                name="Estimated to projected"
+                isAnimationActive={false}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
