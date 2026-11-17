@@ -69,8 +69,8 @@ class TariffConfig(BaseModel):
 class KPICardData(BaseModel):
     current_power_kw: float
     today_kwh: float
-    yesterday_kwh: float
-    today_vs_yesterday_pct: float
+    yesterday_kwh: Optional[float] = None
+    today_vs_yesterday_pct: Optional[float] = None
     estimated_monthly_bill_inr: float
     last_month_bill_inr: float
     monthly_bill_diff_pct: float
