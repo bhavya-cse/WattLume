@@ -687,7 +687,13 @@ def get_current_live_telemetry(db: Session) -> dict:
     wall_now = datetime.utcnow()
 
     if _DATASET_REPLAY_TIME is None:
-        _DATASET_REPLAY_TIME = first_reading.timestamp
+        # Start after a complete previous day is available for comparison.
+        preferred_start = datetime(2016, 1, 3, 6, 0, 0)
+        _DATASET_REPLAY_TIME = (
+            preferred_start
+            if first_reading.timestamp <= preferred_start <= last_reading.timestamp
+            else first_reading.timestamp
+        )
 
     if _DATASET_LAST_WALL_TIME is not None and not paused:
         elapsed = max(
