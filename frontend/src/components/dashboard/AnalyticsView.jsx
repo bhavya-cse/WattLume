@@ -54,6 +54,29 @@ export default function AnalyticsView() {
     loadData(selectedRange);
   }, [selectedRange]);
 
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 space-y-7 max-w-7xl mx-auto" aria-busy="true">
+        <div className="space-y-2">
+          <div className="wd-skeleton h-4 w-36" />
+          <div className="wd-skeleton h-8 w-64" />
+          <div className="wd-skeleton h-4 w-96 max-w-full" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="p-4 rounded-2xl glass-panel space-y-3">
+              <div className="wd-skeleton h-3 w-24" />
+              <div className="wd-skeleton h-8 w-20" />
+              <div className="wd-skeleton h-3 w-28" />
+            </div>
+          ))}
+        </div>
+        <div className="wd-skeleton h-80 w-full rounded-2xl" />
+        <div className="wd-skeleton h-64 w-full rounded-2xl" />
+      </div>
+    );
+  }
+
   const ranges = [
     { id: 'today', label: 'Today (24h)' },
     { id: '7d', label: 'Last 7 Days' },
@@ -197,9 +220,9 @@ export default function AnalyticsView() {
                     <stop offset="95%" stopColor="#42D9E8" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.4} />
+                <CartesianGrid stroke="#94A3B8" strokeOpacity={0.13} strokeDasharray="2 7" vertical={false} />
                 <XAxis dataKey="time" stroke="#94A3B8" fontSize={11} interval={2} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}W`} />
+                <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} tickFormatter={(v) => `${v}W`} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
@@ -214,14 +237,24 @@ export default function AnalyticsView() {
                     return null;
                   }}
                 />
-                <Area type="monotone" dataKey="power_watts" stroke="#42D9E8" strokeWidth={2} fill="url(#todayGrad)" name="Power" />
+                <Area type="monotone" dataKey="power_watts" stroke="#42D9E8" strokeWidth={2.6} fill="url(#todayGrad)" activeDot={{ r: 5, strokeWidth: 2, stroke: "#111316" }} name="Power" />
                 <Line type="monotone" dataKey="baseline_watts" stroke="#94A3B8" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="Baseline" />
               </AreaChart>
             ) : selectedRange === '7d' ? (
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.4} />
-                <XAxis dataKey="day_name" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => v.toLocaleString("en-IN")} />
+              <BarChart data={chartData} margin={{ top: 16, right: 14, left: -8, bottom: 4 }} barCategoryGap="28%">
+                <defs>
+                  <linearGradient id="offPeakGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#42D9E8" stopOpacity={0.95} />
+                    <stop offset="100%" stopColor="#2499B5" stopOpacity={0.72} />
+                  </linearGradient>
+                  <linearGradient id="peakGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#FF9A83" stopOpacity={0.98} />
+                    <stop offset="100%" stopColor="#E96B63" stopOpacity={0.82} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#94A3B8" strokeOpacity={0.13} strokeDasharray="2 7" vertical={false} />
+                <XAxis dataKey="day_name" tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} />
+                <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} tickFormatter={(v) => v.toLocaleString("en-IN")} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
@@ -239,14 +272,14 @@ export default function AnalyticsView() {
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                <Bar dataKey="off_peak_kwh" name="Off-Peak (kWh)" stackId="a" fill="#42D9E8" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="peak_kwh" name="Peak Window 18-22h (kWh)" stackId="a" fill="#FF806B" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="off_peak_kwh" name="Off-Peak (kWh)" stackId="a" fill="url(#offPeakGradient)" radius={[0, 0, 7, 7]} maxBarSize={42} />
+                <Bar dataKey="peak_kwh" name="Peak Window 18-22h (kWh)" stackId="a" fill="url(#peakGradient)" radius={[7, 7, 0, 0]} maxBarSize={42} />
               </BarChart>
             ) : selectedRange === '30d' ? (
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.4} />
+                <CartesianGrid stroke="#94A3B8" strokeOpacity={0.13} strokeDasharray="2 7" vertical={false} />
                 <XAxis dataKey="label" stroke="#94A3B8" fontSize={11} interval={4} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}k`} />
+                <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} tickFormatter={(v) => `${v}k`} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
@@ -262,14 +295,24 @@ export default function AnalyticsView() {
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                <Line type="monotone" dataKey="total_kwh" name="Daily Total (kWh)" stroke="#42D9E8" strokeWidth={2} dot={{ r: 2 }} />
-                <Line type="monotone" dataKey="rolling_avg_kwh" name="7-Day Moving Avg" stroke="#24C78B" strokeWidth={2} dot={false} strokeDasharray="3 3" />
+                <Line type="monotone" dataKey="total_kwh" name="Daily Total (kWh)" stroke="#42D9E8" strokeWidth={2.6} dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: "#111316" }} />
+                <Line type="monotone" dataKey="rolling_avg_kwh" name="7-Day Moving Avg" stroke="#24C78B" strokeWidth={2.4} dot={false} strokeDasharray="5 5" activeDot={{ r: 4 }} />
               </LineChart>
             ) : (
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.4} />
-                <XAxis dataKey="month_label" stroke="#94A3B8" fontSize={11} tickLine={false} />
-                <YAxis stroke="#94A3B8" fontSize={11} tickLine={false} tickFormatter={(v) => `${v}k`} />
+              <BarChart data={chartData} margin={{ top: 16, right: 14, left: -8, bottom: 4 }} barCategoryGap="28%">
+                <defs>
+                  <linearGradient id="currentMonthGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#668BFF" stopOpacity={1} />
+                    <stop offset="100%" stopColor="#4169E1" stopOpacity={0.72} />
+                  </linearGradient>
+                  <linearGradient id="previousMonthGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#A5B4C8" stopOpacity={0.55} />
+                    <stop offset="100%" stopColor="#64748B" stopOpacity={0.28} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#94A3B8" strokeOpacity={0.13} strokeDasharray="2 7" vertical={false} />
+                <XAxis dataKey="month_label" tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} />
+                <YAxis tick={{ fill: "#94A3B8", fontSize: 11 }} axisLine={false} tickLine={false} tickMargin={10} tickFormatter={(v) => `${v}k`} />
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
@@ -287,8 +330,8 @@ export default function AnalyticsView() {
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
-                <Bar dataKey="total_kwh" name="Current Period (kWh)" fill="#4169E1" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="prev_year_kwh" name="Previous Year Baseline" fill="#94A3B8" opacity={0.35} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="total_kwh" name="Current Period (kWh)" fill="url(#currentMonthGradient)" radius={[8, 8, 0, 0]} maxBarSize={30} />
+                <Bar dataKey="prev_year_kwh" name="Previous Year Baseline" fill="url(#previousMonthGradient)" radius={[8, 8, 0, 0]} maxBarSize={30} />
               </BarChart>
             )}
           </ResponsiveContainer>
