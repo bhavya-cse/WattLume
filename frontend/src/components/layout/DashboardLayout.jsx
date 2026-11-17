@@ -1,15 +1,16 @@
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import OverviewView from '../dashboard/OverviewView';
-import AnalyticsView from '../dashboard/AnalyticsView';
-import AppliancesView from '../dashboard/AppliancesView';
-import InsightsView from '../dashboard/InsightsView';
-import BillingView from '../dashboard/BillingView';
-import ReportsView from '../dashboard/ReportsView';
-import SettingsView from '../dashboard/SettingsView';
-import EnergyAssistant from '../assistant/EnergyAssistant';
+
+const OverviewView = lazy(() => import('../dashboard/OverviewView'));
+const AnalyticsView = lazy(() => import('../dashboard/AnalyticsView'));
+const AppliancesView = lazy(() => import('../dashboard/AppliancesView'));
+const InsightsView = lazy(() => import('../dashboard/InsightsView'));
+const BillingView = lazy(() => import('../dashboard/BillingView'));
+const ReportsView = lazy(() => import('../dashboard/ReportsView'));
+const SettingsView = lazy(() => import('../dashboard/SettingsView'));
+const EnergyAssistant = lazy(() => import('../assistant/EnergyAssistant'));
 
 export default function DashboardLayout({
   onBackToLanding,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   const [activeView, setActiveView] = useState(initialView);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [assistantLoaded, setAssistantLoaded] = useState(false);
 
   const renderActiveView = () => {
     switch (activeView) {
@@ -123,10 +125,44 @@ export default function DashboardLayout({
           onNavigateView={setActiveView}
         />
 
-        <main className="wl-dashboard-glass relative flex-1 pb-16">
-          {renderActiveView()}
-        </main>
-        <EnergyAssistant activeView={activeView} />
+        <Suspense
+          fallback={
+            <main className="wl-dashboard-glass relative flex-1 p-4 sm:p-6">
+              <div className="max-w-7xl mx-auto space-y-5">
+                <div className="h-7 w-44 rounded-lg bg-slate-200/70 dark:bg-white/[0.08] animate-pulse" />
+                <div className="h-28 w-full rounded-2xl bg-slate-200/70 dark:bg-white/[0.08] animate-pulse" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="h-48 rounded-2xl bg-slate-200/70 dark:bg-white/[0.08] animate-pulse" />
+                  <div className="h-48 rounded-2xl bg-slate-200/70 dark:bg-white/[0.08] animate-pulse" />
+                </div>
+              </div>
+            </main>
+          }
+        >
+          <main className="wl-dashboard-glass relative flex-1 pb-16">
+            {renderActiveView()}
+          </main>
+        </Suspense>
+
+        {assistantLoaded ? (
+          <Suspense fallback={null}>
+            <EnergyAssistant activeView={activeView} initiallyOpen />
+          </Suspense>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAssistantLoaded(true)}
+            aria-label="Open Lumi"
+            className="fixed bottom-5 right-5 z-[101] flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#173D62] shadow-[0_12px_35px_rgba(23,61,98,0.4)] ring-2 ring-cyan-300/60 transition duration-200 hover:-translate-y-1 hover:scale-105 sm:bottom-6 sm:right-6"
+          >
+            <img
+              src="/assets/wattlume-chatbot.webp"
+              alt="Open Lumi"
+              className="h-full w-full object-cover"
+            />
+            <span className="absolute right-0 top-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-400 dark:border-[#17191D]" />
+          </button>
+        )}
       </div>
     </div>
   );

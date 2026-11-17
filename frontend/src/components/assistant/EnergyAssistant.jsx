@@ -16,8 +16,11 @@ const STARTER_QUESTIONS = [
   'How can I save electricity this week?',
 ];
 
-export default function EnergyAssistant({ activeView = 'overview' }) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function EnergyAssistant({
+  activeView = 'overview',
+  initiallyOpen = false,
+}) {
+  const [isOpen, setIsOpen] = useState(initiallyOpen);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
@@ -116,7 +119,7 @@ export default function EnergyAssistant({ activeView = 'overview' }) {
             <div className="relative flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/25 bg-white/15 shadow-[0_0_30px_rgba(139,125,255,0.3)] backdrop-blur-xl">
-                  <img src="/assets/wattlume-chatbot.png" alt="WattLume" className="h-10 w-10 object-contain" />
+                  <img src="/assets/wattlume-chatbot.webp" alt="WattLume" className="h-10 w-10 object-contain" />
                   <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-[#29275e] bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
                 </div>
 
@@ -178,7 +181,7 @@ export default function EnergyAssistant({ activeView = 'overview' }) {
               <div className="relative z-10 pt-1">
                 <div className="mb-5 flex items-start gap-2.5">
                   <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-violet-200/70 bg-white/75 text-violet-600 shadow-[0_5px_20px_rgba(100,80,180,0.12)] backdrop-blur-xl dark:border-violet-300/15 dark:bg-violet-400/10 dark:text-violet-200">
-                    <img src="/assets/wattlume-chatbot.png" alt="Lumi" className="h-8 w-8 object-contain" />
+                    <img src="/assets/wattlume-chatbot.webp" alt="Lumi" className="h-8 w-8 object-contain" />
                   </div>
                   <div className="rounded-[20px] rounded-tl-md border border-white/55 bg-white/20 px-4 py-3.5 text-[13px] leading-[1.7] text-slate-700 shadow-[0_8px_30px_rgba(53,65,120,0.07)] backdrop-blur-xl dark:border-cyan-200/20 dark:bg-[#17243a]/[.82] dark:text-slate-100 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_12px_32px_rgba(0,0,0,0.2)]">
                     <span className="mb-1 block font-semibold text-[#29285d] dark:text-violet-200">
@@ -221,7 +224,7 @@ export default function EnergyAssistant({ activeView = 'overview' }) {
                 >
                   {message.role === 'model' && (
                     <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-violet-200/70 bg-white/80 text-violet-600 shadow-sm backdrop-blur-xl dark:border-violet-300/20 dark:bg-violet-400/10 dark:text-violet-200">
-                      <img src="/assets/wattlume-chatbot.png" alt="Lumi" className="h-7 w-7 object-contain" />
+                      <img src="/assets/wattlume-chatbot.webp" alt="Lumi" className="h-7 w-7 object-contain" />
                     </div>
                   )}
 
@@ -241,7 +244,7 @@ export default function EnergyAssistant({ activeView = 'overview' }) {
             {isSending && (
               <div className="flex items-end gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-violet-200/60 bg-white/80 text-violet-600 shadow-sm dark:border-violet-300/20 dark:bg-violet-400/10 dark:text-violet-200">
-                  <img src="/assets/wattlume-chatbot.png" alt="Lumi" className="h-7 w-7 object-contain" />
+                  <img src="/assets/wattlume-chatbot.webp" alt="Lumi" className="h-7 w-7 object-contain" />
                 </div>
                 <div className="flex items-center gap-3 rounded-2xl rounded-bl-md border border-white/55 bg-white/28 px-4 py-3 shadow-sm backdrop-blur-2xl dark:border-white/10 dark:bg-white/[0.07]">
                   <span className="flex gap-1.5">
@@ -311,7 +314,7 @@ export default function EnergyAssistant({ activeView = 'overview' }) {
           <X size={23} className="text-white" />
         ) : (
           <img
-            src="/assets/wattlume-chatbot.png"
+            src="/assets/wattlume-chatbot.webp"
             alt="WattLume chatbot"
             className="h-full w-full object-cover"
           />
