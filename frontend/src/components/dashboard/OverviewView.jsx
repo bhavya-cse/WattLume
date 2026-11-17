@@ -185,10 +185,18 @@ export default function OverviewView({ onNavigateView }) {
     return () => clearTimeout(timeout);
   }, [prefersReducedMotion]);
 
+  /* Keep the greeting synchronized with local time */
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   /* Time-of-day greeting */
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
+    const hour = currentTime.getHours();
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
@@ -452,7 +460,7 @@ export default function OverviewView({ onNavigateView }) {
           <span className="text-[11px] font-mono text-slate-500 dark:text-[#A1A6AE]">
             {kpis.yesterday_kwh > 0
               ? `${Math.round((liveKwhToday / kpis.yesterday_kwh) * 100)}% of yesterday's total so far`
-              : 'No data for yesterday yet'}
+              : 'Previous-day comparison unavailable'}
           </span>
         </KpiCell>
 
