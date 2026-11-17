@@ -78,6 +78,7 @@ export default function DashboardLayout({
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
         onBackToLanding={onBackToLanding}
+        className="hidden lg:flex"
       />
 
       {/* Mobile Drawer Backdrop */}

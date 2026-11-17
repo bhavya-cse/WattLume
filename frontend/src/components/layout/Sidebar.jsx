@@ -57,7 +57,8 @@ export default function Sidebar({
   setActiveView,
   collapsed,
   setCollapsed,
-  onBackToLanding
+  onBackToLanding,
+  className = ''
 }) {
   const { unreadAlertsCount, liveTelemetry, isPaused } = useSimulation();
 
@@ -79,7 +80,8 @@ export default function Sidebar({
         transition-[width] duration-300
         ${collapsed ? 'w-16' : 'w-60'}
         bg-white dark:bg-[#17191D]
-        border-r border-slate-200/70 dark:border-white/[0.08]`}
+        border-r border-slate-200/70 dark:border-white/[0.08]
+        ${className}`}
     >
       <div>
         {/* Header */}
