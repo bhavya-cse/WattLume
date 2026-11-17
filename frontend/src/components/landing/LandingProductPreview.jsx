@@ -32,7 +32,7 @@ function usePreviewVisibility(ref) {
         setVisible(entry.isIntersecting);
         if (entry.isIntersecting) setSeen(true);
       },
-      { threshold: 0.2 }
+      { threshold: 0 }
     );
     io.observe(el);
     return () => io.disconnect();
