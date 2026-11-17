@@ -221,9 +221,23 @@
 .wl-preview.wl-in { animation: wl-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* Pause every loop while off-screen */
-.wl-offscreen *,
-.wl-offscreen *::before,
-.wl-offscreen *::after { animation-play-state: paused !important; }
+/* Pause decorative infinite loops off-screen, never content reveals. */
+.wl-offscreen .wl-live-dot,
+.wl-offscreen .wl-live-dot::before,
+.wl-offscreen .wl-live-dot::after,
+.wl-offscreen .wl-kpi::after,
+.wl-offscreen .wl-power-icon,
+.wl-offscreen .wl-power-icon svg,
+.wl-offscreen .wl-power-icon::before,
+.wl-offscreen .wl-power-icon::after,
+.wl-offscreen .wl-power-value,
+.wl-offscreen .wl-line,
+.wl-offscreen .wl-comet,
+.wl-offscreen .wl-peak-ping,
+.wl-offscreen .wl-bar::after,
+.wl-offscreen .wl-nudge {
+  animation-play-state: paused !important;
+}
 
 /* Generic staggered rise (uses `translate`, so hover `transform` still works) */
 .wl-preview:not(.wl-in) .wl-rise { opacity: 0; }
