@@ -4,9 +4,9 @@ const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('wattlume-theme');
-    if (saved) return saved;
-    return 'dark'; // Default to deep midnight navy SaaS aesthetic
+    const saved = localStorage.getItem('wattlume-theme-v2');
+    if (saved === 'light' || saved === 'dark') return saved;
+    return 'light';
   });
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export function ThemeProvider({ children }) {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('wattlume-theme', theme);
+    localStorage.setItem('wattlume-theme-v2', theme);
   }, [theme]);
 
   const toggleTheme = () => {
