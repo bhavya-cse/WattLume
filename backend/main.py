@@ -106,19 +106,44 @@ def get_live(db: Session = Depends(get_db)):
 def get_overview(db: Session = Depends(get_db)):
     """Overview dashboard KPIs, quick charts, live readings and recent alert items."""
     live = get_current_live_telemetry(db)
+    replay_time = datetime.strptime(
+        live["simulated_time"], "%Y-%m-%d %H:%M:%S"
+    )
     tariff = get_or_create_tariff(db)
-    now = datetime.utcnow()
 
-    # Today's date and Yesterday's date
-    today_str = now.strftime("%Y-%m-%d")
-    yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    # Compare against the previous calendar day in the replayed dataset.
+    replay_day_start = replay_time.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    previous_day_start = replay_day_start - timedelta(days=1)
 
-    today_record = db.query(DailyAggregate).filter(DailyAggregate.date == today_str).first()
-    yesterday_record = db.query(DailyAggregate).filter(DailyAggregate.date == yesterday_str).first()
+    previous_day_count, previous_day_sum = (
+        db.query(
+            func.count(HistoricalReading.id),
+            func.sum(HistoricalReading.consumption_kw)
+        )
+        .filter(
+            HistoricalReading.timestamp >= previous_day_start,
+            HistoricalReading.timestamp < replay_day_start
+        )
+        .one()
+    )
 
     today_kwh = live["today_energy_kwh"]
-    yesterday_kwh = yesterday_record.total_energy_kwh if yesterday_record else 12.8
-    today_vs_yesterday_pct = round(((today_kwh - yesterday_kwh) / max(1.0, yesterday_kwh)) * 100.0, 1)
+    yesterday_kwh = (
+        round(float(previous_day_sum or 0.0) / 60.0, 2)
+        if previous_day_count == 1440
+        else None
+    )
+
+    today_vs_yesterday_pct = (
+        round(
+            ((today_kwh - yesterday_kwh) / yesterday_kwh) * 100.0,
+            1
+        )
+        if yesterday_kwh is not None and yesterday_kwh > 0
+        else None
+    )
 
     # Billing intelligence
     billing_data = get_billing_intelligence(db)
@@ -142,9 +167,6 @@ def get_overview(db: Session = Depends(get_db)):
     }
 
     # Hourly chart data for today
-    replay_time = datetime.strptime(
-        live["simulated_time"], "%Y-%m-%d %H:%M:%S"
-    )
     today_analytics = get_analytics_dataset(
         db, "today", as_of=replay_time
     )
