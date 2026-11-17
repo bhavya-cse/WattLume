@@ -24,15 +24,15 @@
   }
 
   .dark {
-    --bg-canvas: #17191D;
-    --bg-surface: #202328;
+    --bg-canvas: #08090B;
+    --bg-surface: #111316;
     --text-primary: #F4F5F6;
     --text-muted: #A1A6AE;
     --border-subtle: rgba(255, 255, 255, 0.08);
 
     /* Charcoal glass system */
-    --glass-bg: rgba(32, 35, 40, 0.72);
-    --glass-bg-elevated: rgba(41, 45, 51, 0.86);
+    --glass-bg: rgba(17, 19, 22, 0.88);
+    --glass-bg-elevated: rgba(25, 28, 32, 0.94);
     --glass-border: rgba(255, 255, 255, 0.09);
     --glass-border-outer: rgba(0, 0, 0, 0.28);
     --glass-shadow:

@@ -18,8 +18,8 @@ export default {
           mint: '#B8F3D5',         // Soft Mint
           lavender: '#A78BFA',     // Lavender
           coral: '#FF806B',        // Coral
-          darkSurface: '#131D2E',  // Apple-like dark surface
-          darkElevated: '#1A263C', // Elevated dark card
+          darkSurface: '#111316',  // Apple-like dark surface
+          darkElevated: '#191C20', // Elevated dark card
           darkBorder: 'rgba(255, 255, 255, 0.08)',
           lightBorder: '#E5E9F0',
         },
