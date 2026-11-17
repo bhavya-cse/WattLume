@@ -28,7 +28,7 @@ from backend.billing import (
 )
 from backend.anomaly_detection import detect_recent_anomalies
 from backend.recommendations import generate_smart_insights_and_recommendations
-from backend.analytics import get_analytics_dataset
+from backend.analytics import get_analytics_dataset, get_appliance_summary
 from backend.gemini_chat import ChatRequest, generate_energy_assistant_reply
 
 # Initialize database schema
@@ -192,9 +192,8 @@ def get_analytics(
 
 @app.get("/api/appliances")
 def list_appliances(db: Session = Depends(get_db)):
-    """Lists all simulated appliances with their active status, power and estimated consumption."""
-    analytics = get_analytics_dataset(db, "7d")
-    return analytics["appliances"]
+    """Lists appliances with their measured consumption and estimated costs."""
+    return get_appliance_summary(db)
 
 @app.post("/api/appliances")
 def create_appliance(app_in: ApplianceCreate, db: Session = Depends(get_db)):

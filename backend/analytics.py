@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from backend.models import Appliance, HistoricalReading
 from backend.billing import compute_bill_for_kwh, get_or_create_tariff
@@ -24,9 +25,17 @@ APPLIANCE_MAPPING = {
 }
 
 
-def _load_readings(db, start, end):
+def _load_readings(db, start, end, include_breakdown=False):
+    columns = [
+        HistoricalReading.timestamp,
+        HistoricalReading.consumption_kw,
+    ]
+
+    if include_breakdown:
+        columns.append(HistoricalReading.appliance_breakdown)
+
     return (
-        db.query(HistoricalReading)
+        db.query(*columns)
         .filter(
             HistoricalReading.timestamp >= start,
             HistoricalReading.timestamp <= end
@@ -46,6 +55,101 @@ def _read_breakdown(reading):
 def _sample_energy(reading):
     # Dataset readings are one-minute samples in kW.
     return max(0.0, reading.consumption_kw) / 60.0
+
+def get_appliance_summary(
+    db: Session,
+    now: datetime = None
+) -> list:
+    """Build appliance summaries from actual readings in the last 14 days."""
+
+    first_timestamp, last_timestamp = (
+        db.query(
+            func.min(HistoricalReading.timestamp),
+            func.max(HistoricalReading.timestamp)
+        ).one()
+    )
+
+    if first_timestamp is None or last_timestamp is None:
+        return []
+
+    now = now or last_timestamp
+
+    appliance_start = max(
+        first_timestamp,
+        now - timedelta(days=14)
+    )
+
+    appliance_readings = _load_readings(
+        db, appliance_start, now, include_breakdown=True
+    )
+
+    appliance_energy = defaultdict(float)
+
+    for reading in appliance_readings:
+        breakdown = _read_breakdown(reading)
+
+        for app_name, dataset_column in APPLIANCE_MAPPING.items():
+            value = breakdown.get(dataset_column)
+
+            if value is not None:
+                try:
+                    appliance_energy[app_name] += (
+                        max(0.0, float(value)) / 60.0
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+    tariff = get_or_create_tariff(db)
+    unit_cost = (
+        tariff.flat_rate
+        if tariff.model_type == "flat"
+        else 7.5
+    )
+
+    appliances = db.query(Appliance).all()
+
+    elapsed_days = max(
+        1,
+        (now.date() - appliance_start.date()).days + 1
+    )
+
+    total_app_kwh = sum(appliance_energy.values())
+
+    appliance_list_summary = []
+
+    for app in appliances:
+        kwh = appliance_energy.get(app.name, 0.0)
+        daily_kwh = kwh / elapsed_days
+        daily_cost = daily_kwh * unit_cost
+        monthly_cost = daily_cost * 30.0
+
+        percentage = (
+            (kwh / total_app_kwh) * 100.0
+            if total_app_kwh > 0 else 0.0
+        )
+
+        appliance_list_summary.append({
+            "id": app.id,
+            "name": app.name,
+            "category": app.category,
+            "icon": app.icon,
+            "power_watts": app.power_watts,
+            "is_active": app.is_active,
+            "room": app.room or "",
+            "measurement_available": app.name in APPLIANCE_MAPPING,
+            "daily_energy_kwh": round(daily_kwh, 3),
+            "daily_cost_inr": round(daily_cost, 2),
+            "monthly_cost_inr": round(monthly_cost, 2),
+            "percentage_share": round(percentage, 1)
+        })
+
+    appliance_list_summary.sort(
+        key=lambda item: item["percentage_share"],
+        reverse=True
+    )
+
+    return appliance_list_summary
+
 
 
 def get_analytics_dataset(
@@ -405,75 +509,8 @@ def get_analytics_dataset(
         )
 
     # ---------------------------------------------------------
-    # APPLIANCE BREAKDOWN: Actual readings from the last 14 days
-    # ---------------------------------------------------------
-    appliance_start = max(
-        first_timestamp,
-        now - timedelta(days=14)
-    )
-
-    appliance_readings = _load_readings(
-        db, appliance_start, now
-    )
-
-    appliance_energy = defaultdict(float)
-
-    for reading in appliance_readings:
-        breakdown = _read_breakdown(reading)
-
-        for app_name, dataset_column in APPLIANCE_MAPPING.items():
-            value = breakdown.get(dataset_column)
-
-            if value is not None:
-                try:
-                    appliance_energy[app_name] += (
-                        max(0.0, float(value)) / 60.0
-                    )
-                except (TypeError, ValueError):
-                    pass
-
-    appliances = db.query(Appliance).all()
-
-    elapsed_days = max(
-        1,
-        (now.date() - appliance_start.date()).days + 1
-    )
-
-    total_app_kwh = sum(appliance_energy.values())
-
-    appliance_list_summary = []
-
-    for app in appliances:
-        kwh = appliance_energy.get(app.name, 0.0)
-
-        daily_kwh = kwh / elapsed_days
-        daily_cost = daily_kwh * unit_cost
-        monthly_cost = daily_cost * 30.0
-
-        percentage = (
-            (kwh / total_app_kwh) * 100.0
-            if total_app_kwh > 0 else 0.0
-        )
-
-        appliance_list_summary.append({
-            "id": app.id,
-            "name": app.name,
-            "category": app.category,
-            "icon": app.icon,
-            "power_watts": app.power_watts,
-            "is_active": app.is_active,
-            "room": app.room or "",
-            "measurement_available": app.name in APPLIANCE_MAPPING,
-            "daily_energy_kwh": round(daily_kwh, 3),
-            "daily_cost_inr": round(daily_cost, 2),
-            "monthly_cost_inr": round(monthly_cost, 2),
-            "percentage_share": round(percentage, 1)
-        })
-
-    appliance_list_summary.sort(
-        key=lambda item: item["percentage_share"],
-        reverse=True
-    )
+    # Appliance summaries are calculated by the dedicated helper.
+    appliance_list_summary = get_appliance_summary(db, now)
 
     # Environmental impact based on actual KPI energy consumption.
     carbon_kg = round(total_energy_kwh * 0.82, 1)
