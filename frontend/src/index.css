@@ -52,7 +52,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -219,25 +219,6 @@
 /* Root: hidden until seen, then rises in */
 .wl-preview:not(.wl-in) { opacity: 0; }
 .wl-preview.wl-in { animation: wl-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
-
-/* Pause every loop while off-screen */
-/* Pause decorative infinite loops off-screen, never content reveals. */
-.wl-offscreen .wl-live-dot,
-.wl-offscreen .wl-live-dot::before,
-.wl-offscreen .wl-live-dot::after,
-.wl-offscreen .wl-kpi::after,
-.wl-offscreen .wl-power-icon,
-.wl-offscreen .wl-power-icon svg,
-.wl-offscreen .wl-power-icon::before,
-.wl-offscreen .wl-power-icon::after,
-.wl-offscreen .wl-power-value,
-.wl-offscreen .wl-line,
-.wl-offscreen .wl-comet,
-.wl-offscreen .wl-peak-ping,
-.wl-offscreen .wl-bar::after,
-.wl-offscreen .wl-nudge {
-  animation-play-state: paused !important;
-}
 
 /* Generic staggered rise (uses `translate`, so hover `transform` still works) */
 .wl-preview:not(.wl-in) .wl-rise { opacity: 0; }
@@ -507,5 +488,36 @@
   .wl-preview:not(.wl-in) .wl-chart-wipe {
     clip-path: none !important;
     animation: none !important;
+  }
+}
+
+/* Prevent mobile Safari glass-layer repaint glitches in the landing preview */
+@media (max-width: 767px) {
+  #hero .backdrop-blur-2xl,
+  #hero .backdrop-blur-xl {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+}
+
+/* Avoid 3D compositing issues in the landing preview on mobile Safari */
+@media (max-width: 767px) {
+  #hero .wl-preview {
+    perspective: none !important;
+    transform: none !important;
+  }
+
+  #hero .wl-preview > div {
+    transform: none !important;
+    transition: none !important;
+    will-change: auto !important;
+  }
+}
+
+/* TEMP TEST: isolate mobile Safari fixed-navbar backdrop rendering */
+@media (max-width: 767px) {
+  header.fixed > div {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 }

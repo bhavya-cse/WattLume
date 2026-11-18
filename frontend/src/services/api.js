@@ -1,7 +1,7 @@
 // API service connecting React frontend to FastAPI backend
 
-const API_HOST = typeof window !== 'undefined' && (window.location.port === '5173' || window.location.port === '5174')
-  ? 'http://127.0.0.1:8000'
+const API_HOST = typeof window !== 'undefined' && ['5173', '5174'].includes(window.location.port)
+  ? `http://${window.location.hostname === 'localhost' ? 'localhost' : '192.168.29.114'}:8000`
   : '';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || API_HOST).replace(/\/$/, '');

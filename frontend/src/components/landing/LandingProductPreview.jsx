@@ -14,40 +14,23 @@ const prefersReducedMotion = () =>
   window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/* Plays the intro once when the preview scrolls into view,
-   and pauses looping animations while it is off-screen. */
-function usePreviewVisibility(ref) {
-  const [seen, setSeen] = useState(false);
-  const [visible, setVisible] = useState(true);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
-    if (!('IntersectionObserver' in window)) {
-      setSeen(true);
-      return undefined;
-    }
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        setVisible(entry.isIntersecting);
-        if (entry.isIntersecting) setSeen(true);
-      },
-      { threshold: 0 }
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [ref]);
-
-  return { seen, visible };
+/* Keep the landing preview visible independently of scroll position. */
+function usePreviewVisibility() {
+  return { seen: true, visible: true };
 }
 
 /* Counts up to the existing value. Final frame is always exactly `to`. */
 function CountUp({ to, decimals = 0, duration = 1400, delay = 0, active, suffix = '' }) {
-  const [val, setVal] = useState(() => (prefersReducedMotion() ? to : 0));
+  const [val, setVal] = useState(() => (
+    prefersReducedMotion() ||
+    (typeof window !== 'undefined' && window.innerWidth <= 767)
+      ? to
+      : 0
+  ));
 
   useEffect(() => {
     if (!active) return undefined;
-    if (prefersReducedMotion()) {
+    if (prefersReducedMotion() || window.innerWidth <= 767) {
       setVal(to);
       return undefined;
     }

@@ -15,7 +15,7 @@ import {
   Layers,
   Search
 } from 'lucide-react';
-import { fetchAnalytics } from '../../services/api';
+import { fetchAnalytics, fetchAppliances } from '../../services/api';
 
 export default function AnalyticsView() {
   const [selectedRange, setSelectedRange] = useState('7d');
@@ -29,7 +29,15 @@ export default function AnalyticsView() {
     setLoading(true);
 
     try {
-      const data = await fetchAnalytics(range);
+      const [chartData, applianceData] = await Promise.all([
+        fetchAnalytics(range),
+        fetchAppliances(),
+      ]);
+
+      const data = {
+        ...chartData,
+        appliances: applianceData,
+      };
 
       if (currentRequest !== requestId.current) return;
 
