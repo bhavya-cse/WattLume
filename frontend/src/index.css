@@ -471,3 +471,41 @@
 .dark .wl-toast button {
   color: #cbd5e1 !important;
 }
+
+
+/* MOBILE PREVIEW: render content in its final visible state */
+@media (max-width: 767px) {
+  .wl-preview,
+  .wl-preview:not(.wl-in) {
+    opacity: 1 !important;
+    visibility: visible !important;
+    animation: none !important;
+  }
+
+  .wl-preview .wl-rise,
+  .wl-preview:not(.wl-in) .wl-rise {
+    opacity: 1 !important;
+    visibility: visible !important;
+    animation: none !important;
+    translate: none !important;
+  }
+
+  .wl-preview .wl-peak-dot,
+  .wl-preview:not(.wl-in) .wl-peak-dot {
+    opacity: 1 !important;
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .wl-preview .wl-bar,
+  .wl-preview:not(.wl-in) .wl-bar {
+    transform: none !important;
+    animation: none !important;
+  }
+
+  .wl-preview .wl-chart-wipe,
+  .wl-preview:not(.wl-in) .wl-chart-wipe {
+    clip-path: none !important;
+    animation: none !important;
+  }
+}
