@@ -188,7 +188,7 @@ def get_analytics(
     db: Session = Depends(get_db)
 ):
     """Returns in-depth analytics dataset based on the requested time range."""
-    return get_analytics_dataset(db, range)
+    return get_analytics_dataset(db, range, include_appliances=False)
 
 @app.get("/api/appliances")
 def list_appliances(db: Session = Depends(get_db)):
@@ -413,8 +413,7 @@ def get_reports(
         description = "Historical monthly consumption and estimated bills using the configured tariff. The final month represents a partial billing period."
 
     elif period == "appliances":
-        analytics = get_analytics_dataset(db, "7d")
-        rows = analytics["appliances"]
+        rows = get_appliance_summary(db)
         title = "Appliance-Wise Energy Apportionment Report"
         description = "Breakdown of individual appliance power ratings, active duty cycles, and monthly cost allocations."
 

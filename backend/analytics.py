@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from backend.models import Appliance, HistoricalReading
 from backend.billing import compute_bill_for_kwh, get_or_create_tariff
@@ -79,25 +79,78 @@ def get_appliance_summary(
         now - timedelta(days=14)
     )
 
-    appliance_readings = _load_readings(
-        db, appliance_start, now, include_breakdown=True
-    )
-
     appliance_energy = defaultdict(float)
 
-    for reading in appliance_readings:
-        breakdown = _read_breakdown(reading)
+    if db.bind.dialect.name == "postgresql":
+        # Aggregate appliance readings inside PostgreSQL instead of
+        # transferring and parsing thousands of individual JSON records.
+        select_parts = []
+        params = {
+            "start": appliance_start,
+            "end": now,
+        }
 
-        for app_name, dataset_column in APPLIANCE_MAPPING.items():
-            value = breakdown.get(dataset_column)
+        for index, (app_name, dataset_column) in enumerate(
+            APPLIANCE_MAPPING.items()
+        ):
+            column_param = f"column_{index}"
+            params[column_param] = dataset_column
 
-            if value is not None:
-                try:
-                    appliance_energy[app_name] += (
-                        max(0.0, float(value)) / 60.0
-                    )
-                except (TypeError, ValueError):
-                    pass
+            select_parts.append(f"""
+                COALESCE(
+                    SUM(
+                        CASE
+                            WHEN pg_input_is_valid(
+                                parsed.data ->> :{column_param},
+                                'double precision'
+                            )
+                            THEN GREATEST(
+                                (parsed.data ->> :{column_param})::double precision,
+                                0.0
+                            )
+                            ELSE 0.0
+                        END
+                    ),
+                    0.0
+                ) AS energy_{index}
+            """)
+
+        aggregation_query = text(f"""
+            SELECT {", ".join(select_parts)}
+            FROM historical_readings AS reading
+            CROSS JOIN LATERAL (
+                SELECT reading.appliance_breakdown::jsonb AS data
+            ) AS parsed
+            WHERE reading.timestamp >= :start
+              AND reading.timestamp <= :end
+        """)
+
+        totals = db.execute(aggregation_query, params).one()
+
+        for index, app_name in enumerate(APPLIANCE_MAPPING):
+            appliance_energy[app_name] = (
+                float(totals[index] or 0.0) / 60.0
+            )
+
+    else:
+        # Keep the original implementation for SQLite compatibility.
+        appliance_readings = _load_readings(
+            db, appliance_start, now, include_breakdown=True
+        )
+
+        for reading in appliance_readings:
+            breakdown = _read_breakdown(reading)
+
+            for app_name, dataset_column in APPLIANCE_MAPPING.items():
+                value = breakdown.get(dataset_column)
+
+                if value is not None:
+                    try:
+                        appliance_energy[app_name] += (
+                            max(0.0, float(value)) / 60.0
+                        )
+                    except (TypeError, ValueError):
+                        pass
 
     tariff = get_or_create_tariff(db)
     unit_cost = (
@@ -155,7 +208,8 @@ def get_appliance_summary(
 def get_analytics_dataset(
     db: Session,
     time_range: str = "7d",
-    as_of: datetime = None
+    as_of: datetime = None,
+    include_appliances: bool = True
 ) -> Dict[str, Any]:
 
     tariff = get_or_create_tariff(db)
@@ -199,11 +253,8 @@ def get_analytics_dataset(
             hour=0, minute=0, second=0, microsecond=0
         )
 
-        # Readings available up to the current replay time.
-        # These are used for KPIs and must not include future data.
-        readings = _load_readings(db, today_start, now)
-
-        # Full available simulated day for the chart.
+        # Fetch the full simulated day once.
+        # Reuse it for both the full-day chart and elapsed-only KPIs.
         chart_end = (
             today_start + timedelta(days=1) - timedelta(seconds=1)
         )
@@ -211,6 +262,12 @@ def get_analytics_dataset(
         chart_readings = _load_readings(
             db, today_start, chart_end
         )
+
+        # Exclude future replay readings from KPI calculations.
+        readings = [
+            reading for reading in chart_readings
+            if reading.timestamp <= now
+        ]
 
         # Separate hourly buckets for chart and KPI calculations.
         chart_hourly = defaultdict(list)
@@ -228,18 +285,49 @@ def get_analytics_dataset(
             today_start - timedelta(days=30)
         )
 
-        baseline_readings = _load_readings(
-            db,
-            baseline_start,
-            today_start - timedelta(seconds=1)
-        )
+        baseline_end = today_start - timedelta(seconds=1)
 
-        baseline_bins = defaultdict(list)
+        if db.bind.dialect.name == "postgresql":
+            baseline_rows = db.execute(
+                text("""
+                    SELECT
+                        EXTRACT(HOUR FROM timestamp)::int AS hour,
+                        AVG(consumption_kw * 1000.0) AS baseline_watts
+                    FROM historical_readings
+                    WHERE timestamp >= :start
+                      AND timestamp <= :end
+                    GROUP BY EXTRACT(HOUR FROM timestamp)
+                """),
+                {
+                    "start": baseline_start,
+                    "end": baseline_end
+                }
+            ).all()
 
-        for reading in baseline_readings:
-            baseline_bins[reading.timestamp.hour].append(
-                reading.consumption_kw * 1000.0
+            baseline_bins = {
+                int(row.hour): float(row.baseline_watts)
+                for row in baseline_rows
+            }
+
+        else:
+            baseline_readings = _load_readings(
+                db,
+                baseline_start,
+                baseline_end
             )
+
+            baseline_bins = defaultdict(list)
+
+            for reading in baseline_readings:
+                baseline_bins[reading.timestamp.hour].append(
+                    reading.consumption_kw * 1000.0
+                )
+
+            baseline_bins = {
+                hour: sum(values) / len(values)
+                for hour, values in baseline_bins.items()
+                if values
+            }
 
         for hour in range(24):
 
@@ -294,12 +382,7 @@ def get_analytics_dataset(
             else:
                 off_peak_hours_kwh += kpi_energy
 
-            baseline_values = baseline_bins.get(hour, [])
-
-            baseline_watts = (
-                sum(baseline_values) / len(baseline_values)
-                if baseline_values else 0.0
-            )
+            baseline_watts = baseline_bins.get(hour, 0.0)
 
             chart_data.append({
                 "time": f"{hour:02d}:00",
@@ -509,8 +592,10 @@ def get_analytics_dataset(
         )
 
     # ---------------------------------------------------------
-    # Appliance summaries are calculated by the dedicated helper.
-    appliance_list_summary = get_appliance_summary(db, now)
+    # Appliance summaries can be skipped when fetched independently.
+    appliance_list_summary = (
+        get_appliance_summary(db, now) if include_appliances else []
+    )
 
     # Environmental impact based on actual KPI energy consumption.
     carbon_kg = round(total_energy_kwh * 0.82, 1)
